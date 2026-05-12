@@ -1,0 +1,117 @@
+# =========================================================
+# Visual Studio / .NET / MAUI
+# =========================================================
+
+.vs/
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# =========================================================
+# Build / publish output
+# =========================================================
+
+publish/
+Publish/
+Release/
+Debug/
+artifacts/
+TestResults/
+
+# =========================================================
+# NuGet
+# =========================================================
+
+*.nupkg
+packages/
+.nuget/
+
+# =========================================================
+# Local databases / app runtime data
+# =========================================================
+
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+
+# =========================================================
+# Secrets / local config
+# =========================================================
+
+.env
+.env.*
+secrets.json
+appsettings.Development.json
+appsettings.Local.json
+
+# =========================================================
+# Castle local media/cache
+# Do not push downloaded songs, thumbnails, or user covers
+# =========================================================
+
+Downloads/
+downloads/
+Music/
+music/
+Cache/
+cache/
+covers/
+Covers/
+thumbnails/
+Thumbnails/
+
+wwwroot/covers/
+wwwroot/downloads/
+wwwroot/cache/
+wwwroot/thumbnails/
+
+# Third-party runtime binaries
+# Keep local for testing, but do not push to source repo.
+Castle/ffmpeg.exe
+Castle/ffplay.exe
+Castle/ffprobe.exe
+Castle/yt-dlp.exe
+Castle/bass.dll
+Castle.core/bass.dll
+
+# Keep built-in app assets manually.
+# Example: theme wallpapers/logo in wwwroot are okay if you own them:
+# wwwroot/skull-logo.png
+# wwwroot/warzone-bg.png
+# wwwroot/cat-bg.png
+# wwwroot/aero-bgm.png
+
+# =========================================================
+# OS junk
+# =========================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================================================
+# Inno Setup output
+# =========================================================
+
+installer/Output/
+*.tmp

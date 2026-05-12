@@ -1,0 +1,275 @@
+﻿@page "/dashboard"
+@using Castle.Core.Interfaces
+@using Castle.Core.Services
+@inject ISongRepository SongRepo
+@inject IRecentlyPlayedRepository RecentlyPlayedRepo
+@inject PlaybackService Player
+@inject QueueService Queue
+@inject NavigationManager Navigation
+
+<div class="dashboard-page">
+    @* Greeting *@
+    <div class="dash-greeting">
+        <h2>@GetGreeting()</h2>
+        <p class="status-text">@GetGreetingSubtitle()</p>
+    </div>
+
+    @* Hero Stats Row *@
+    <div class="dash-hero-row">
+        <div class="dash-hero-card">
+            <LiMusic Size="28" Stroke="var(--accent)" />
+            <div>
+                <span class="dash-hero-value">@_totalSongs</span>
+                <span class="dash-hero-label">Total Songs</span>
+            </div>
+        </div>
+        <div class="dash-hero-card">
+            <LiClock Size="28" Stroke="var(--accent)" />
+            <div>
+                <span class="dash-hero-value">@FormatHours(_totalHours)</span>
+                <span class="dash-hero-label">Listening Time</span>
+            </div>
+        </div>
+        <div class="dash-hero-card">
+            <LiHeart Size="28" Stroke="var(--accent)" />
+            <div>
+                <span class="dash-hero-value">@_favoriteCount</span>
+                <span class="dash-hero-label">Favorites</span>
+            </div>
+        </div>
+        <div class="dash-hero-card">
+            <LiFlame Size="28" Stroke="var(--accent)" />
+            <div>
+                <span class="dash-hero-value">@_topGenre</span>
+                <span class="dash-hero-label">Top Genre</span>
+            </div>
+        </div>
+    </div>
+
+    @* Quick Actions *@
+    <div class="dash-actions">
+        <button @onclick="PlayMostPlayed" class="dash-action-btn">
+            <LiPlay Size="16" Stroke="#fff" /> Play Your Top Artist
+        </button>
+        <button @onclick="PlayRecent" class="dash-action-btn">
+            <LiClock Size="16" Stroke="#fff" /> Resume Recently Played
+        </button>
+        <button @onclick="PlayRandom" class="dash-action-btn">
+            <LiShuffle Size="16" Stroke="#fff" /> Shuffle Library
+        </button>
+    </div>
+
+    @* Main Content Grid *@
+    <div class="dash-grid">
+        @* Top Artists *@
+        <div class="dash-panel">
+            <h3><LiUser Size="16" Stroke="var(--accent)" /> Top Artists</h3>
+            @if (_topArtists.Count == 0)
+            {
+                <p class="status-text">Listen to more music to see your top artists.</p>
+            }
+            else
+            {
+                <div class="dash-artist-list">
+                    @{
+                        var maxCount = _topArtists.Max(a => a.Count);
+                    }
+                    @foreach (var artist in _topArtists.Take(6))
+                    {
+                        var barWidth = (int)((double)artist.Count / maxCount * 100);
+                        <div class="dash-artist-row">
+                            <span class="dash-artist-name">@artist.Name</span>
+                            <div class="dash-artist-bar-wrap">
+                                <div class="dash-artist-bar" style="width: @barWidth%;"></div>
+                            </div>
+                            <span class="dash-artist-count">@artist.Count</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* Top Genres *@
+        <div class="dash-panel">
+            <h3><LiTag Size="16" Stroke="var(--accent)" /> Top Genres</h3>
+            @if (_topGenres.Count == 0)
+            {
+                <p class="status-text">Scan your library to see genre stats.</p>
+            }
+            else
+            {
+                <div class="dash-genre-cloud">
+                    @foreach (var genre in _topGenres.Take(8))
+                    {
+                        var size = 12 + (genre.Count * 2);
+                        <span class="dash-genre-tag" style="font-size: @(Math.Min(size, 22))px;">
+                            @genre.Name
+                            <span class="dash-genre-count">@genre.Count</span>
+                        </span>
+                    }
+                </div>
+            }
+        </div>
+
+        @* Recently Played *@
+        <div class="dash-panel dash-panel-wide">
+            <h3><LiClock Size="16" Stroke="var(--accent)" /> Recently Played</h3>
+            @if (_recentlyPlayed.Count == 0)
+            {
+                <p class="status-text">Nothing played yet.</p>
+            }
+            else
+            {
+                <div class="dash-recent-list">
+                    @foreach (var entry in _recentlyPlayed.Take(8))
+                    {
+                        <div class="dash-recent-item" @onclick="() => PlayRecent(entry)">
+                            @if (!string.IsNullOrEmpty(entry.CoverArtPath))
+                            {
+                                <img src="@GetCoverUrl(entry.CoverArtPath)" class="dash-recent-cover" />
+                            }
+                            else
+                            {
+                                <div class="dash-recent-cover-placeholder"><LiMusic Size="16" Stroke="#555" /></div>
+                            }
+                            <div class="dash-recent-info">
+                                <span class="dash-recent-title">@entry.Title</span>
+                                <span class="dash-recent-artist">@entry.Artist</span>
+                            </div>
+                            <span class="dash-recent-time">@FormatTimeAgo(entry.PlayedAt)</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private int _totalSongs;
+    private int _favoriteCount;
+    private double _totalHours;
+    private string _topGenre = "—";
+    private List<(string Name, int Count)> _topArtists = new();
+    private List<(string Name, int Count)> _topGenres = new();
+    private List<Castle.Core.Models.RecentlyPlayedEntry> _recentlyPlayed = new();
+
+    protected override void OnInitialized()
+    {
+        LoadStats();
+        Queue.QueueChanged += () => InvokeAsync(LoadStats);
+    }
+
+    void LoadStats()
+    {
+        var songs = SongRepo.GetAll();
+        _totalSongs = songs.Count;
+        _favoriteCount = songs.Count(s => s.IsFavorite);
+        _totalHours = songs.Sum(s => s.Duration.TotalSeconds) / 3600;
+
+        _topArtists = songs
+            .Where(s => s.Artist != "Unknown Artist")
+            .GroupBy(s => s.Artist)
+            .OrderByDescending(g => g.Count())
+            .Take(8)
+            .Select(g => (Name: g.Key, Count: g.Count()))
+            .ToList();
+
+        _topGenres = songs
+            .Where(s => !string.IsNullOrWhiteSpace(s.Genre))
+            .SelectMany(s => s.Genre.Split(',').Select(g => g.Trim()))
+            .Where(g => g.Length > 1)
+            .GroupBy(g => g)
+            .OrderByDescending(g => g.Count())
+            .Take(10)
+            .Select(g => (Name: g.Key, Count: g.Count()))
+            .ToList();
+
+        _topGenre = _topGenres.FirstOrDefault().Name ?? "—";
+
+        _recentlyPlayed = RecentlyPlayedRepo.GetAll(12);
+    }
+
+    string GetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        if (hour < 12) return "Good Morning";
+        if (hour < 17) return "Good Afternoon";
+        return "Good Evening";
+    }
+
+    string GetGreetingSubtitle()
+    {
+        if (_totalSongs == 0) return "Start your music journey — scan a folder or download some tracks!";
+        if (_recentlyPlayed.Count == 0) return "Play something to see your stats grow.";
+        return $"You've been vibing to {_topArtists.FirstOrDefault().Name ?? "music"} lately.";
+    }
+
+    void PlayMostPlayed()
+    {
+        if (_topArtists.Count == 0) return;
+        var songs = SongRepo.GetAll().Where(s => s.Artist == _topArtists[0].Name).ToList();
+        if (songs.Count > 0) Player.PlayQueue(songs, 0);
+    }
+
+    void PlayRecent()
+    {
+        if (_recentlyPlayed.Count == 0) return;
+        var entry = _recentlyPlayed[0];
+        var song = new Castle.Core.Models.Song
+        {
+            FilePath = entry.FilePath,
+            Title = entry.Title,
+            Artist = entry.Artist,
+            Duration = entry.Duration,
+            CoverArtPath = entry.CoverArtPath
+        };
+        Player.PlaySong(song);
+    }
+
+    void PlayRandom()
+    {
+        var songs = SongRepo.GetAll();
+        if (songs.Count == 0) return;
+        var random = new Random();
+        Player.PlayQueue(songs.OrderBy(_ => random.Next()).ToList(), 0);
+    }
+
+    void PlayRecent(Castle.Core.Models.RecentlyPlayedEntry entry)
+    {
+        var song = new Castle.Core.Models.Song
+        {
+            FilePath = entry.FilePath,
+            Title = entry.Title,
+            Artist = entry.Artist,
+            Duration = entry.Duration,
+            CoverArtPath = entry.CoverArtPath
+        };
+        Player.PlaySong(song);
+    }
+
+    string GetCoverUrl(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return "";
+        if (path.Contains("wwwroot")) { var fn = Path.GetFileName(path); return $"covers/{fn}"; }
+        if (File.Exists(path)) return $"file:///{path.Replace("\\", "/")}";
+        return "";
+    }
+
+    string FormatHours(double hours)
+    {
+        if (hours < 1) return $"{(int)(hours * 60)}m";
+        if (hours < 24) return $"{(int)hours}h";
+        return $"{(int)(hours / 24)}d";
+    }
+
+    string FormatTimeAgo(DateTime playedAt)
+    {
+        var diff = DateTime.Now - playedAt;
+        if (diff.TotalMinutes < 1) return "now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d";
+        return playedAt.ToString("MMM dd");
+    }
+}

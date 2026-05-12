@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Castle.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <Color x:Key="Primary">#9E1E2C</Color>
+            <Color x:Key="Secondary">#1A1D26</Color>
+            <Color x:Key="Tertiary">#222530</Color>
+            <Color x:Key="PageBackgroundColor">#1A1D26</Color>
+            <Color x:Key="WindowBackgroundColor">#1A1D26</Color>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

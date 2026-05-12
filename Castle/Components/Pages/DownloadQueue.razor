@@ -1,0 +1,54 @@
+﻿@page "/downloadqueue"
+@using Castle.Core.Services
+@inject DownloadQueueService DQ
+
+<h3><LiDownload Size="20" Stroke="#BBBBBB" /> DOWNLOAD QUEUE</h3>
+
+@if (DQ.Queue.Count == 0)
+{
+    <div class="empty-state">
+        <LiDownload Size="48" Stroke="#555" />
+        <h3>Download queue is empty</h3>
+        <p class="status-text">Add songs from Search & Download to start downloading.</p>
+    </div>
+}
+else
+{
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3>@DQ.Queue.Count ITEMS</h3>
+        <button @onclick="() => DQ.ClearCompleted()" class="refresh-btn" title="Clear completed">
+            <LiTrash2 Size="14" Stroke="#ff4444" /> Clear Completed
+        </button>
+    </div>
+
+    <div class="queue-list">
+        @foreach (var item in DQ.Queue)
+        {
+            <div class="queue-item">
+                <div class="queue-item-info">
+                    <span class="queue-item-title">@item.Title</span>
+                    <span class="queue-item-artist">@item.Artist</span>
+                </div>
+                <span class="queue-status @GetStatusClass(item.Status)">@item.Status</span>
+                @if (item.Status == "Queued")
+                {
+                    <button @onclick="() => DQ.RemoveFromQueue(item.VideoUrl)"
+                            class="playlist-remove-btn" title="Remove">
+                        <LiX Size="14" Stroke="#ff4444" />
+                    </button>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    string GetStatusClass(string status) => status switch
+    {
+        "Queued" => "status-queued",
+        "Downloading" => "status-downloading",
+        "Complete" => "status-complete",
+        "Failed" => "status-failed",
+        _ => ""
+    };
+}

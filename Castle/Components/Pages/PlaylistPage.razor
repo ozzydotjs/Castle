@@ -1,0 +1,291 @@
+﻿@page "/playlist/{Id}"
+@using Castle.Core.Interfaces
+@using Castle.Core.Models
+@using Castle.Core.Services
+@inject IPlaylistRepository PlaylistRepo
+@inject ISongRepository SongRepo
+@inject PlaybackService Player
+@inject QueueService QueueService
+@inject NavigationManager Navigation
+
+@if (_playlist == null)
+{
+    <div class="empty-state">
+        <LiMusic Size="48" Stroke="#555" />
+        <h3>Playlist not found</h3>
+        <p class="status-text">This playlist may have been deleted.</p>
+    </div>
+}
+else
+{
+    <div class="playlist-header-row">
+        <button @onclick="GoBack" class="ctrl-btn" title="Back to Library">
+            <LiArrowLeft Size="18" Stroke="#BBBBBB" />
+        </button>
+
+        <h2>@_playlist.Name</h2>
+
+        <button @onclick="PlayAll" class="ctrl-btn" title="Play All" disabled="@(_songs.Count == 0)">
+            <LiPlay Size="18" Stroke="#BBBBBB" />
+        </button>
+
+        <button @onclick="ExportPlaylist" class="ctrl-btn" title="Export as .m3u">
+            <LiDownload Size="18" Stroke="#BBBBBB" />
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_statusMessage))
+    {
+        <p class="status-text">@_statusMessage</p>
+    }
+
+    @if (_songs.Count == 0)
+    {
+        <div class="empty-state">
+            <LiListMusic Size="48" Stroke="#555" />
+            <h3>This playlist is empty</h3>
+            <p class="status-text">Add songs from the Library by right-clicking them.</p>
+        </div>
+    }
+    else
+    {
+        <h3>@_songs.Count SONGS</h3>
+
+        <ul class="song-list">
+            @foreach (var song in _songs)
+            {
+                <li @onclick="() => PlaySong(song)"
+                    @oncontextmenu="(e) => OpenContextMenu(e, song)"
+                    class="@(Player.Queue.CurrentSong?.FilePath == song.FilePath ? "active" : "")">
+                    @if (!string.IsNullOrEmpty(song.CoverArtPath))
+                    {
+                        <img src="@GetCoverUrl(song.CoverArtPath)" class="song-cover" />
+                    }
+                    else
+                    {
+                        <span class="song-cover-placeholder">🎵</span>
+                    }
+
+                    <span class="song-info">
+                        <span class="song-title">@song.Title</span>
+                        <span class="song-artist">@song.Artist</span>
+                    </span>
+
+                    <span class="song-duration">@FormatDuration(song.Duration)</span>
+
+                    <button @onclick="() => RemoveSong(song)"
+                            @onclick:stopPropagation="true"
+                            class="playlist-remove-btn"
+                            title="Remove from playlist">
+                        <LiX Size="14" Stroke="#ff4444" />
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@if (_contextMenuVisible)
+{
+    <div class="context-menu" style="left: @(_contextX)px; top: @(_contextY)px;" @key="_contextSong?.Id">
+        <div class="context-item" @onclick="() => { PlaySong(_contextSong!); CloseContextMenu(); }">▶ Play</div>
+        <div class="context-item" @onclick="() => { Player.PlayQueue(_songs, _songs.IndexOf(_contextSong!)); CloseContextMenu(); }">▶ Play Next</div>
+        <div class="context-item" @onclick="() => { QueueService.Add(_contextSong!); if (!Player.IsPlaying) Player.PlaySong(_contextSong!); CloseContextMenu(); }">
+            ➕ Add to Queue
+        </div>
+        <div class="context-separator"></div>
+        <div class="context-item" @onclick="CloseContextMenu">Close</div>
+    </div>
+
+    <div class="context-overlay" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"></div>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private Playlist? _playlist;
+    private List<Song> _songs = new();
+    private bool _contextMenuVisible;
+    private double _contextX;
+    private double _contextY;
+    private Song? _contextSong;
+    private string _statusMessage = "";
+
+    protected override void OnInitialized()
+    {
+        LoadPlaylist();
+        Player.Queue.QueueChanged += () => InvokeAsync(StateHasChanged);
+    }
+
+    private void LoadPlaylist()
+    {
+        _playlist = PlaylistRepo.GetById(Id);
+
+        if (_playlist != null)
+        {
+            _songs = _playlist.SongIds
+                .Select(songId => SongRepo.GetById(songId))
+                .Where(s => s != null)
+                .Cast<Song>()
+                .ToList();
+        }
+    }
+
+    private void PlaySong(Song song)
+    {
+        Player.PlayQueue(_songs, _songs.IndexOf(song));
+    }
+
+    private void PlayAll()
+    {
+        if (_songs.Count > 0)
+        {
+            Player.PlayQueue(_songs, 0);
+        }
+    }
+
+    private void RemoveSong(Song song)
+    {
+        PlaylistRepo.RemoveSong(Id, song.Id);
+        LoadPlaylist();
+        StateHasChanged();
+    }
+
+    private async Task ExportPlaylist()
+    {
+        if (_playlist == null || _songs.Count == 0)
+        {
+            return;
+        }
+
+        var m3u = new System.Text.StringBuilder();
+        m3u.AppendLine("#EXTM3U");
+        m3u.AppendLine($"#PLAYLIST:{_playlist.Name}");
+
+        foreach (var song in _songs)
+        {
+            m3u.AppendLine($"#EXTINF:{song.Duration.TotalSeconds:F0},{song.Artist} - {song.Title}");
+            m3u.AppendLine(song.FilePath);
+        }
+
+        var exportsFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "Castle",
+            "Playlists"
+        );
+
+        Directory.CreateDirectory(exportsFolder);
+
+        var safePlaylistName = SanitizeFileName(_playlist.Name);
+        var filePath = GetUniqueFilePath(exportsFolder, safePlaylistName, ".m3u");
+
+        await File.WriteAllTextAsync(filePath, m3u.ToString());
+
+        _statusMessage = $"Exported to Documents/Castle/Playlists/{Path.GetFileName(filePath)}";
+        StateHasChanged();
+    }
+
+    private void OpenContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Song song)
+    {
+        _contextSong = song;
+        _contextX = e.ClientX;
+        _contextY = e.ClientY;
+        _contextMenuVisible = true;
+
+        StateHasChanged();
+    }
+
+    private void CloseContextMenu()
+    {
+        _contextMenuVisible = false;
+        _contextSong = null;
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private string GetCoverUrl(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return "";
+        }
+
+        if (path.Contains("wwwroot"))
+        {
+            var fileName = Path.GetFileName(path);
+            return $"covers/{fileName}";
+        }
+
+        if (File.Exists(path))
+        {
+            return $"file:///{path.Replace("\\", "/")}";
+        }
+
+        return "";
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+        {
+            return string.Format("{0}:{1:D2}:{2:D2}", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
+        }
+
+        return string.Format("{0}:{1:D2}", duration.Minutes, duration.Seconds);
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Untitled Playlist";
+        }
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(name.Select(c => invalidChars.Contains(c) ? '_' : c).ToArray());
+
+        sanitized = sanitized.Trim('.', ' ');
+
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            sanitized = "Untitled Playlist";
+        }
+
+        return sanitized.Length > 100 ? sanitized[..100].Trim() : sanitized;
+    }
+
+    private static string GetUniqueFilePath(string folder, string baseName, string extension)
+    {
+        Directory.CreateDirectory(folder);
+
+        if (!extension.StartsWith('.'))
+        {
+            extension = "." + extension;
+        }
+
+        var path = Path.Combine(folder, $"{baseName}{extension}");
+
+        if (!File.Exists(path))
+        {
+            return path;
+        }
+
+        var counter = 1;
+
+        while (true)
+        {
+            var candidate = Path.Combine(folder, $"{baseName} ({counter}){extension}");
+
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            counter++;
+        }
+    }
+}

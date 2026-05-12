@@ -1,0 +1,184 @@
+﻿@page "/themes"
+@using Castle.Services
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+
+@{
+    var standardThemes = ThemeService.BuiltInThemes.Where(t => !t.IsRgb).ToList();
+    var specialThemes = ThemeService.BuiltInThemes.Where(t => t.IsRgb).ToList();
+}
+
+<h3><LiPalette Size="20" Stroke="#BBBBBB" /> THEMES</h3>
+
+<h3 style="margin-top: 24px;">Standard Themes</h3>
+<div class="theme-grid">
+    @foreach (var theme in standardThemes)
+    {
+        <div class="theme-card @(ThemeService.CurrentTheme.Name == theme.Name ? "selected" : "")"
+             @onclick="() => ApplyTheme(theme.Name)"
+             title="@theme.Description">
+            <div class="theme-preview" style="
+                background: @theme.BgPrimary;
+                border: 2px solid @theme.Border;
+                @(theme.Wallpaper != null ? $"background-image: url('{theme.Wallpaper}'); background-size: cover;" : "")">
+                <div class="theme-preview-sidebar" style="background: @theme.SidebarBg;"></div>
+                <div class="theme-preview-content">
+                    <div class="theme-preview-bar" style="background: @theme.Accent;"></div>
+                    <div class="theme-preview-text" style="background: @theme.TextPrimary; opacity: 0.8;"></div>
+                    <div class="theme-preview-text" style="background: @theme.TextSecondary; opacity: 0.6; width: 60%;"></div>
+                </div>
+            </div>
+            <span class="theme-name">@theme.Name</span>
+            @if (ThemeService.CurrentTheme.Name == theme.Name)
+            {
+                <span class="theme-active-badge"><LiCheck Size="14" Stroke="#fff" /></span>
+            }
+        </div>
+    }
+</div>
+
+<h3 style="margin-top: 32px;">Special Themes</h3>
+<div class="theme-grid">
+    @foreach (var theme in specialThemes)
+    {
+        <div class="theme-card @(ThemeService.CurrentTheme.Name == theme.Name ? "selected" : "")"
+             @onclick="() => ApplyTheme(theme.Name)"
+             title="@theme.Description">
+            <div class="theme-preview rgb-preview" style="
+                background: @theme.BgPrimary;
+                border: 2px solid @theme.Border;">
+                <div class="theme-preview-sidebar" style="background: @theme.SidebarBg;"></div>
+                <div class="theme-preview-content">
+                    <div class="theme-preview-bar rgb-bar"></div>
+                    <div class="theme-preview-text" style="background: @theme.TextPrimary; opacity: 0.8;"></div>
+                    <div class="theme-preview-text" style="background: @theme.TextSecondary; opacity: 0.6; width: 60%;"></div>
+                </div>
+            </div>
+            <span class="theme-name">@theme.Name</span>
+            @if (ThemeService.CurrentTheme.Name == theme.Name)
+            {
+                <span class="theme-active-badge"><LiCheck Size="14" Stroke="#fff" /></span>
+            }
+        </div>
+    }
+</div>
+
+@* ========== VISUALIZER SETTINGS ========== *@
+<h3 style="margin-top: 32px;"><LiEqualizer Size="20" Stroke="#BBBBBB" /> VISUALIZER</h3>
+<p class="status-text">Colors come from your active theme. Style is independent.</p>
+
+<div class="viz-style-grid">
+    @foreach (var style in VisualizerStyles)
+    {
+        <div class="viz-style-card @(_vizStyle == style.Value ? "selected" : "")"
+             @onclick="() => SetVisualizerStyle(style.Value)">
+            <div class="viz-style-preview">
+                <div class="viz-preview-bars">
+                    @for (int i = 0; i < 8; i++)
+                    {
+                        <div class="viz-preview-bar" style="height: @(12 + i * 5)px; background: var(--accent);"></div>
+                    }
+                </div>
+            </div>
+            <span class="viz-style-name">@style.Label</span>
+        </div>
+    }
+</div>
+
+<div class="viz-speed-row">
+    <label>Speed: @_vizSpeed.ToString("F1")x</label>
+    <input type="range" min="0.5" max="10" step="0.5"
+           value="@_vizSpeed"
+           @oninput="OnSpeedChange" />
+</div>
+
+<div class="viz-speed-row">
+    <label>Intensity: @(_vizIntensity * 100).ToString("F0")%</label>
+    <input type="range" min="10" max="100" step="5"
+           value="@(_vizIntensity * 100)"
+           @oninput="OnIntensityChange" />
+</div>
+
+@code {
+    private const string VizStyleKey = "castle_viz_style";
+    private const string VizSpeedKey = "castle_viz_speed";
+    private const string VizIntensityKey = "castle_viz_intensity";
+
+    private string _vizStyle = "bars";
+    private double _vizSpeed = 2;
+    private double _vizIntensity = 0.6;
+
+    private record StyleOption(string Value, string Label);
+    private StyleOption[] VisualizerStyles = new[]
+    {
+        new StyleOption("bars", "Classic Bars"),
+        new StyleOption("glow", "Glow Bars"),
+        new StyleOption("rainbow", "Rainbow Wave"),
+    };
+
+    protected override void OnInitialized()
+    {
+        ThemeService.ThemeChanged += () => InvokeAsync(StateHasChanged);
+        LoadVisualizerPrefs();
+    }
+
+    void LoadVisualizerPrefs()
+    {
+        _vizStyle = Preferences.Get(VizStyleKey, "bars");
+        _vizSpeed = Preferences.Get(VizSpeedKey, 2.0);
+        _vizIntensity = Preferences.Get(VizIntensityKey, 0.6);
+    }
+
+    void SetVisualizerStyle(string style)
+    {
+        _vizStyle = style;
+        Preferences.Set(VizStyleKey, style);
+    }
+
+    void OnSpeedChange(ChangeEventArgs e)
+    {
+        _vizSpeed = Convert.ToDouble(e.Value ?? 2);
+        Preferences.Set(VizSpeedKey, _vizSpeed);
+    }
+
+    void OnIntensityChange(ChangeEventArgs e)
+    {
+        _vizIntensity = Convert.ToDouble(e.Value ?? 60) / 100.0;
+        Preferences.Set(VizIntensityKey, _vizIntensity);
+    }
+
+    void ApplyTheme(string name)
+    {
+        ThemeService.ApplyTheme(name);
+        ApplyCssVariables();
+    }
+
+    async void ApplyCssVariables()
+    {
+        var t = ThemeService.CurrentTheme;
+        await JS.InvokeVoidAsync("applyTheme", new
+        {
+            bgPrimary = t.BgPrimary,
+            bgSecondary = t.BgSecondary,
+            bgSurface = t.BgSurface,
+            border = t.Border,
+            textPrimary = t.TextPrimary,
+            textSecondary = t.TextSecondary,
+            accent = t.Accent,
+            accentHover = t.AccentHover,
+            accentSubtle = t.AccentSubtle,
+            accentActive = t.AccentActive,
+            iconDefault = t.IconDefault,
+            progressFill = t.ProgressFill,
+            favoriteColor = t.FavoriteColor,
+            playerBarBg = t.PlayerBarBg,
+            sidebarBg = t.SidebarBg,
+            wallpaper = t.Wallpaper,
+            isRgb = t.IsRgb,
+            rgbSpeed = t.RgbSpeed,
+            rgbBrightness = t.RgbBrightness,
+            rgbSaturation = t.RgbSaturation,
+            rgbPattern = t.RgbPattern
+        });
+    }
+}

@@ -1,0 +1,463 @@
+﻿@page "/nowplaying"
+@using Castle.Core.Services
+@using Castle.Core.Models
+@using System.Timers
+@implements IDisposable
+@inject PlaybackService Player
+@inject QueueService Queue
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject Castle.Services.ThemeService ThemeService
+
+<div class="now-playing-page @(_controlsVisible ? "" : "np-immersive")" @onclick="HandleBackgroundClick">
+    @if (Queue.CurrentSong == null)
+    {
+        <div class="np-empty">
+            <LiMusic Size="64" Stroke="#555" />
+            <h2>Nothing Playing</h2>
+            <p class="status-text">Play a song to see it here.</p>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(Queue.CurrentSong.CoverArtPath))
+        {
+            <div class="np-background" style="background-image: url('@GetCoverUrl(Queue.CurrentSong.CoverArtPath)')"></div>
+        }
+
+        <div class="np-overlay @(Player.IsPlaying ? "" : "paused")"></div>
+
+        <canvas id="np-visualizer" class="np-visualizer @(_controlsVisible ? "" : "full")"></canvas>
+
+        <button @onclick="GoBack"
+                @onclick:stopPropagation="true"
+                class="np-back-btn @(_controlsVisible ? "" : "hidden")"
+                title="Back to Library">
+            <LiArrowLeft Size="20" Stroke="#FFFFFF" />
+            <span>Back</span>
+        </button>
+
+        @if (UpcomingSongs.Count > 0)
+        {
+            <div class="np-queue-floating @(_controlsVisible ? "" : "np-queue-floating-immersive")"
+                 @onclick:stopPropagation="true">
+                <div class="np-queue-header">
+                    <div>
+                        <span>Up Next</span>
+                        <small>@UpcomingSongs.Count song@(UpcomingSongs.Count == 1 ? "" : "s") queued</small>
+                    </div>
+                </div>
+
+                <div class="np-queue-list">
+                    @foreach (var item in GetUpcomingQueueItems())
+                    {
+                        <button class="np-queue-item @(item.Index == 0 ? "next" : "")"
+                                @onclick="() => PlayQueueSong(item.Song)"
+                                title="Play @item.Song.Title">
+                            @if (!string.IsNullOrEmpty(item.Song.CoverArtPath))
+                            {
+                                <img src="@GetCoverUrl(item.Song.CoverArtPath)" class="np-queue-cover" />
+                            }
+                            else
+                            {
+                                <div class="np-queue-cover-placeholder">
+                                    <LiMusic Size="16" Stroke="#777" />
+                                </div>
+                            }
+
+                            <div class="np-queue-text">
+                                <span class="np-queue-title">@item.Song.Title</span>
+                                <span class="np-queue-artist">@item.Song.Artist</span>
+                            </div>
+
+                            @if (item.Index == 0)
+                            {
+                                <span class="np-queue-badge">Next</span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="np-content" @onclick:stopPropagation="true" @onclick="HandleContentClick">
+            <div class="np-art @(Player.IsPlaying ? "floating" : "")"
+                 @onclick="() => Player.PlayPause()"
+                 title="Click to Play/Pause">
+                @if (!string.IsNullOrEmpty(Queue.CurrentSong.CoverArtPath))
+                {
+                    <img src="@GetCoverUrl(Queue.CurrentSong.CoverArtPath)" class="np-art-image" />
+                }
+                else
+                {
+                    <div class="np-art-placeholder">
+                        <LiMusic Size="80" Stroke="#555" />
+                    </div>
+                }
+
+                <div class="np-art-overlay">
+                    @if (Player.IsPlaying)
+                    {
+                        <LiPause Size="48" Stroke="#FFFFFF" />
+                    }
+                    else
+                    {
+                        <LiPlay Size="48" Stroke="#FFFFFF" />
+                    }
+                </div>
+            </div>
+
+            <div class="np-info @(_controlsVisible ? "" : "hidden")">
+                <h1 class="np-title">@Queue.CurrentSong.Title</h1>
+                <p class="np-artist">@Queue.CurrentSong.Artist</p>
+
+                @if (!string.IsNullOrWhiteSpace(Queue.CurrentSong.Album) && Queue.CurrentSong.Album != "Unknown Album")
+                {
+                    <p class="np-album">@Queue.CurrentSong.Album</p>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Queue.CurrentSong.Genre))
+                {
+                    <p class="np-genre">@Queue.CurrentSong.Genre</p>
+                }
+            </div>
+
+            <div class="np-bottom @(_controlsVisible ? "" : "hidden")">
+                <div class="np-seek">
+                    <span class="np-time">@FormatTime(_position)</span>
+
+                    <input type="range"
+                           min="0"
+                           max="@((int)_duration)"
+                           step="1"
+                           value="@((int)_position)"
+                           @oninput="OnSeek"
+                           class="np-seek-bar" />
+
+                    <span class="np-time">@FormatTime(_duration)</span>
+                </div>
+
+                <div class="np-controls">
+                    <button @onclick="() => Queue.ToggleShuffle()"
+                            class="np-ctrl-btn @(Queue.IsShuffled ? "active" : "")"
+                            title="Shuffle">
+                        <LiShuffle Size="20" Stroke="#BBBBBB" />
+                    </button>
+
+                    <button @onclick="() => Player.Previous()" class="np-ctrl-btn" title="Previous">
+                        <LiSkipBack Size="26" Stroke="#FFFFFF" />
+                    </button>
+
+                    <button @onclick="() => Player.PlayPause()" class="np-play-btn" title="Play/Pause">
+                        @if (Player.IsPlaying)
+                        {
+                            <LiPause Size="32" Stroke="#FFFFFF" />
+                        }
+                        else
+                        {
+                            <LiPlay Size="32" Stroke="#FFFFFF" />
+                        }
+                    </button>
+
+                    <button @onclick="() => Player.Next()" class="np-ctrl-btn" title="Next">
+                        <LiSkipForward Size="26" Stroke="#FFFFFF" />
+                    </button>
+
+                    <button @onclick="() => Queue.CycleRepeat()"
+                            class="np-ctrl-btn @(Queue.Repeat != RepeatMode.Off ? "active" : "")"
+                            title="Repeat">
+                        @if (Queue.Repeat == RepeatMode.RepeatOne)
+                        {
+                            <LiRepeat1 Size="20" Stroke="#BBBBBB" />
+                        }
+                        else
+                        {
+                            <LiRepeat Size="20" Stroke="#BBBBBB" />
+                        }
+                    </button>
+
+                    <button @onclick="ToggleFavorite"
+                            class="np-ctrl-btn @(_isFavorite ? "active" : "")"
+                            title="Favorite">
+                        <LiHeart Size="20"
+                                 Stroke="@(_isFavorite ? "var(--accent)" : "#BBBBBB")"
+                                 Fill="@(_isFavorite ? "var(--accent)" : "none")" />
+                    </button>
+
+                    <div class="np-volume-inline">
+                        <LiVolume2 Size="14" Stroke="#999" />
+
+                        <input type="range"
+                               min="0"
+                               max="100"
+                               value="@((int)(Player.GetVolume() * 100))"
+                               @oninput="OnVolumeChange"
+                               class="np-volume-mini" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="np-lyrics-container @(_controlsVisible ? "" : "np-lyrics-immersive")">
+                @if (Player.CurrentLyrics != null && Player.CurrentLyrics.Count > 0)
+                {
+                    var lyrics = Player.CurrentLyrics;
+                    var hasTimestamps = lyrics.Any(l => l.Timestamp > TimeSpan.Zero);
+                    var activeIndex = 0;
+
+                    if (hasTimestamps)
+                    {
+                        for (int i = 0; i < lyrics.Count; i++)
+                        {
+                            if (_position >= lyrics[i].Timestamp.TotalSeconds)
+                            {
+                                activeIndex = i;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var progress = _duration > 0 ? _position / _duration : 0;
+                        activeIndex = (int)(progress * lyrics.Count);
+
+                        if (activeIndex >= lyrics.Count)
+                        {
+                            activeIndex = lyrics.Count - 1;
+                        }
+
+                        if (activeIndex < 0)
+                        {
+                            activeIndex = 0;
+                        }
+                    }
+
+                    var startIndex = Math.Max(0, activeIndex - 2);
+                    var endIndex = Math.Min(lyrics.Count - 1, activeIndex + 4);
+
+                    <div class="np-lyrics-window">
+                        <div class="np-lyrics-scroll" @key="activeIndex">
+                            @for (int i = startIndex; i <= endIndex; i++)
+                            {
+                                var lineClass = i == activeIndex
+                                    ? "active"
+                                    : Math.Abs(i - activeIndex) == 1
+                                        ? "near"
+                                        : "far";
+
+                                <p class="np-lyric-line @lineClass">
+                                    @lyrics[i].Text
+                                </p>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private const string VizStyleKey = "castle_viz_style";
+    private const string VizSpeedKey = "castle_viz_speed";
+    private const string VizIntensityKey = "castle_viz_intensity";
+
+    private double _position;
+    private double _duration;
+    private System.Timers.Timer? _timer;
+    private System.Timers.Timer? _hideControlsTimer;
+    private bool _controlsVisible = true;
+    private bool _isFavorite;
+
+    private List<Song> UpcomingSongs => Queue.GetUpcoming(5);
+
+    private sealed class QueuePreviewItem
+    {
+        public required Song Song { get; init; }
+        public required int Index { get; init; }
+    }
+
+    protected override void OnInitialized()
+    {
+        Player.StateChanged += () => InvokeAsync(StateHasChanged);
+        Queue.QueueChanged += () => InvokeAsync(RefreshFavorite);
+        UpdateFavorite();
+    }
+
+    private List<QueuePreviewItem> GetUpcomingQueueItems()
+    {
+        return UpcomingSongs
+            .Select((song, index) => new QueuePreviewItem
+            {
+                Song = song,
+                Index = index
+            })
+            .ToList();
+    }
+
+    private void RefreshFavorite()
+    {
+        UpdateFavorite();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateFavorite()
+    {
+        _isFavorite = Player.IsCurrentSongFavorite();
+    }
+
+    protected override async void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _timer = new System.Timers.Timer(50);
+            _timer.Elapsed += async (_, _) =>
+            {
+                try
+                {
+                    _position = Player.GetPosition();
+                    _duration = Player.GetDuration();
+
+                    await JS.InvokeVoidAsync("drawVisualizer", Array.Empty<float>(), _position, _duration);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch
+                {
+                }
+            };
+
+            _timer.AutoReset = true;
+            _timer.Start();
+
+            var theme = ThemeService.CurrentTheme;
+            var style = Preferences.Get(VizStyleKey, "bars");
+            var speed = Preferences.Get(VizSpeedKey, 2.0);
+            var intensity = Preferences.Get(VizIntensityKey, 0.6);
+
+            await JS.InvokeVoidAsync("startVisualizer", new
+            {
+                style,
+                color = theme.Accent,
+                secondary = theme.AccentHover,
+                speed,
+                intensity
+            });
+        }
+    }
+
+    private void HandleBackgroundClick()
+    {
+        GoBack();
+    }
+
+    private void HandleContentClick()
+    {
+        _controlsVisible = !_controlsVisible;
+        ResetHideTimer();
+    }
+
+    private void ResetHideTimer()
+    {
+        _hideControlsTimer?.Stop();
+        _hideControlsTimer?.Dispose();
+
+        _hideControlsTimer = new System.Timers.Timer(4000);
+        _hideControlsTimer.Elapsed += (_, _) =>
+        {
+            _controlsVisible = false;
+            InvokeAsync(StateHasChanged);
+        };
+
+        _hideControlsTimer.AutoReset = false;
+        _hideControlsTimer.Start();
+    }
+
+    private void PlayQueueSong(Song song)
+    {
+        var selected = Queue.JumpToSong(song);
+
+        if (selected != null)
+        {
+            Player.PlaySong(selected);
+            UpdateFavorite();
+            ResetHideTimer();
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ToggleFavorite()
+    {
+        Player.ToggleFavorite();
+        _isFavorite = !_isFavorite;
+    }
+
+    private void OnSeek(ChangeEventArgs e)
+    {
+        var v = Convert.ToDouble(e.Value ?? 0);
+        Player.Seek(v);
+        _position = v;
+        ResetHideTimer();
+    }
+
+    private void OnVolumeChange(ChangeEventArgs e)
+    {
+        Player.SetVolume(Convert.ToInt32(e.Value ?? 50) / 100f);
+        Player.SaveVolume();
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private string GetCoverUrl(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return "";
+        }
+
+        if (path.Contains("wwwroot"))
+        {
+            var fn = Path.GetFileName(path);
+            return $"covers/{fn}";
+        }
+
+        if (File.Exists(path))
+        {
+            return $"file:///{path.Replace("\\", "/")}";
+        }
+
+        return "";
+    }
+
+    private string FormatTime(double s)
+    {
+        if (double.IsNaN(s) || double.IsInfinity(s) || s < 0)
+        {
+            return "0:00";
+        }
+
+        var t = TimeSpan.FromSeconds(s);
+        return t.Minutes + ":" + t.Seconds.ToString("D2");
+    }
+
+    public void Dispose()
+    {
+        _timer?.Stop();
+        _timer?.Dispose();
+
+        _hideControlsTimer?.Stop();
+        _hideControlsTimer?.Dispose();
+
+        try
+        {
+            JS.InvokeVoidAsync("stopVisualizer");
+        }
+        catch
+        {
+        }
+    }
+}

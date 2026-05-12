@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+
+    <link rel="icon" type="image/png" href="skull-logo.png" />
+    <link rel="stylesheet" href="app.css" />
+    <link href="Castle.styles.css" rel="stylesheet" />
+
+    <style>
+        #blazor-error-ui {
+            display: none !important;
+        }
+
+        :root,
+        html,
+        body {
+            background: transparent !important;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #app {
+            min-height: 100vh;
+            width: 100%;
+        }
+
+        body {
+            position: relative;
+            background-color: transparent !important;
+            overflow: hidden;
+        }
+
+        #app {
+            position: relative;
+            z-index: 1;
+            background: transparent !important;
+        }
+
+        .castle-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--bg-primary, #0D0D0D);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            gap: 20px;
+        }
+
+            .castle-loader img {
+                width: min(25vw, 140px);
+                height: auto;
+                object-fit: contain;
+            }
+
+            .castle-loader .logo-text {
+                color: #ffffff;
+                font-size: clamp(18px, 4vw, 26px);
+                font-weight: 800;
+                letter-spacing: 4px;
+                text-transform: uppercase;
+            }
+
+        .loader-bar-wrap {
+            width: min(60vw, 300px);
+            height: 4px;
+            background: #2A2E3A;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loader-bar-fill {
+            height: 100%;
+            background: #9E1E2C;
+            border-radius: 2px;
+            animation: loader-slide 1.8s ease-in-out infinite;
+        }
+
+        @keyframes loader-slide {
+            0% {
+                width: 0%;
+                margin-left: 0%;
+            }
+
+            50% {
+                width: 40%;
+                margin-left: 30%;
+            }
+
+            100% {
+                width: 0%;
+                margin-left: 100%;
+            }
+        }
+
+        .theme-wallpaper {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            z-index: 0 !important;
+            opacity: 1 !important;
+            pointer-events: none !important;
+        }
+    </style>
+
+    <script>
+        (function () {
+            var root = document.documentElement;
+
+            if (!localStorage.getItem('castle-theme')) {
+                root.style.setProperty('--bg-primary', '#0D0D0D');
+                root.style.setProperty('--bg-secondary', '#141414');
+                root.style.setProperty('--bg-surface', '#1A1A1A');
+                root.style.setProperty('--border', '#2A2A2A');
+                root.style.setProperty('--text-primary', '#FFFFFF');
+                root.style.setProperty('--text-secondary', '#999999');
+                root.style.setProperty('--accent', '#CC0000');
+                root.style.setProperty('--accent-hover', '#FF0000');
+                root.style.setProperty('--accent-subtle', '#1A0000');
+                root.style.setProperty('--accent-active', '#FF0000');
+                root.style.setProperty('--icon-default', '#BBBBBB');
+                root.style.setProperty('--progress-fill', '#CC0000');
+                root.style.setProperty('--favorite-color', '#FF0000');
+                root.style.setProperty('--player-bar-bg', '#141414');
+                root.style.setProperty('--sidebar-bg', '#0A0A0A');
+            }
+        })();
+    </script>
+</head>
+
+<body>
+    <div class="castle-loader" id="castle-loader">
+        <img src="skull-logo.png" alt="Castle" />
+        <span class="logo-text">CASTLE</span>
+        <div class="loader-bar-wrap">
+            <div class="loader-bar-fill"></div>
+        </div>
+    </div>
+
+    <div id="app"></div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="">Reload</a>
+        <a class="dismiss">✖</a>
+    </div>
+
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+    <script>
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                var loader = document.getElementById('castle-loader');
+
+                if (loader) {
+                    loader.style.opacity = '0';
+                    loader.style.transition = 'opacity 0.3s ease';
+
+                    setTimeout(function () {
+                        loader.style.display = 'none';
+                    }, 300);
+                }
+            }, 600);
+        });
+
+        window.addKeyboardListener = function () {
+            if (window._castleKeyboardListenerAdded) {
+                return;
+            }
+
+            window._castleKeyboardListenerAdded = true;
+
+            document.addEventListener('keydown', function (e) {
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+                    return;
+                }
+
+                const key = e.key;
+                const ctrl = e.ctrlKey;
+
+                switch (key) {
+                    case ' ':
+                        e.preventDefault();
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', 'PlayPause');
+                        break;
+
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', ctrl ? 'Previous' : 'SeekBack');
+                        break;
+
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', ctrl ? 'Next' : 'SeekForward');
+                        break;
+
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', 'VolumeUp');
+                        break;
+
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', 'VolumeDown');
+                        break;
+
+                    case 'm':
+                    case 'M':
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', 'Mute');
+                        break;
+
+                    case 's':
+                    case 'S':
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', 'Shuffle');
+                        break;
+
+                    case 'r':
+                    case 'R':
+                        DotNet.invokeMethodAsync('Castle', 'HandleKey', 'Repeat');
+                        break;
+                }
+            });
+        };
+
+        window.scrollToActive = function (listClass) {
+            setTimeout(function () {
+                var active = document.querySelector('.' + listClass + ' li.active');
+
+                if (active) {
+                    active.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+            }, 100);
+        };
+
+        window.setTitle = function (title) {
+            document.title = title;
+        };
+
+        window.animateCoverPulse = function () {
+            var cover = document.querySelector('.player-cover');
+
+            if (cover) {
+                cover.classList.remove('anim-pulse');
+                void cover.offsetWidth;
+                cover.classList.add('anim-pulse');
+            }
+        };
+
+        function getThemeValue(theme, camelName, pascalName, fallback) {
+            if (!theme) {
+                return fallback;
+            }
+
+            var value = theme[camelName];
+
+            if (value === undefined || value === null || value === '') {
+                value = theme[pascalName];
+            }
+
+            if (value === undefined || value === null || value === '') {
+                value = fallback;
+            }
+
+            return value;
+        }
+
+        function hslToHex(h, s, l) {
+            s /= 100;
+            l /= 100;
+
+            const k = n => (n + h / 30) % 12;
+            const a = s * Math.min(l, 1 - l);
+            const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+
+            const toHex = x => {
+                const hex = Math.round(255 * f(x)).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            };
+
+            return `#${toHex(0)}${toHex(8)}${toHex(4)}`;
+        }
+
+        window.startRgbAnimation = function (theme) {
+            if (window._rgbInterval) {
+                clearInterval(window._rgbInterval);
+                window._rgbInterval = null;
+            }
+
+            var isRgb = getThemeValue(theme, 'isRgb', 'IsRgb', false);
+
+            if (!isRgb) {
+                return;
+            }
+
+            var speed = (getThemeValue(theme, 'rgbSpeed', 'RgbSpeed', 3) || 3) * 1000 / 360;
+            var brightness = getThemeValue(theme, 'rgbBrightness', 'RgbBrightness', 1) || 1;
+            var saturation = getThemeValue(theme, 'rgbSaturation', 'RgbSaturation', 1) || 1;
+            var hue = 0;
+
+            window._rgbInterval = setInterval(function () {
+                hue = (hue + 1) % 360;
+
+                var accent = hslToHex(hue, saturation * 100, 50 * brightness);
+                var accentHover = hslToHex(hue, saturation * 100, 65 * brightness);
+                var accentSubtle = hslToHex(hue, saturation * 30, 10 * brightness);
+                var accentActive = hslToHex(hue, saturation * 60, 70 * brightness);
+                var progressFill = hslToHex(hue, saturation * 100, 50 * brightness);
+                var favoriteColor = hslToHex((hue + 30) % 360, saturation * 100, 50 * brightness);
+
+                var root = document.documentElement;
+
+                root.style.setProperty('--accent', accent);
+                root.style.setProperty('--accent-hover', accentHover);
+                root.style.setProperty('--accent-subtle', accentSubtle);
+                root.style.setProperty('--accent-active', accentActive);
+                root.style.setProperty('--progress-fill', progressFill);
+                root.style.setProperty('--favorite-color', favoriteColor);
+            }, speed);
+        };
+
+        window.applyTheme = function (theme) {
+            if (!theme) {
+                return;
+            }
+
+            var root = document.documentElement;
+
+            function get(camelName, pascalName, fallback) {
+                var value = theme[camelName];
+
+                if (value === undefined || value === null || value === '') {
+                    value = theme[pascalName];
+                }
+
+                if (value === undefined || value === null || value === '') {
+                    value = fallback;
+                }
+
+                return value;
+            }
+
+            var themeName = get('name', 'Name', 'Castle Dark');
+            var wallpaperPath = get('wallpaper', 'Wallpaper', '');
+
+            root.style.setProperty('--bg-primary', get('bgPrimary', 'BgPrimary', '#0D0D0D'));
+            root.style.setProperty('--bg-secondary', get('bgSecondary', 'BgSecondary', '#141414'));
+            root.style.setProperty('--bg-surface', get('bgSurface', 'BgSurface', '#1A1A1A'));
+            root.style.setProperty('--border', get('border', 'Border', '#2A2A2A'));
+            root.style.setProperty('--text-primary', get('textPrimary', 'TextPrimary', '#FFFFFF'));
+            root.style.setProperty('--text-secondary', get('textSecondary', 'TextSecondary', '#999999'));
+            root.style.setProperty('--accent', get('accent', 'Accent', '#CC0000'));
+            root.style.setProperty('--accent-hover', get('accentHover', 'AccentHover', '#FF0000'));
+            root.style.setProperty('--accent-subtle', get('accentSubtle', 'AccentSubtle', '#1A0000'));
+            root.style.setProperty('--accent-active', get('accentActive', 'AccentActive', '#FF0000'));
+            root.style.setProperty('--icon-default', get('iconDefault', 'IconDefault', '#BBBBBB'));
+            root.style.setProperty('--progress-fill', get('progressFill', 'ProgressFill', '#CC0000'));
+            root.style.setProperty('--favorite-color', get('favoriteColor', 'FavoriteColor', '#FF0000'));
+            root.style.setProperty('--player-bar-bg', get('playerBarBg', 'PlayerBarBg', '#141414'));
+            root.style.setProperty('--sidebar-bg', get('sidebarBg', 'SidebarBg', '#0A0A0A'));
+
+            root.setAttribute('data-theme', themeName);
+
+            var oldWallpaper = document.querySelector('.theme-wallpaper');
+
+            if (oldWallpaper) {
+                oldWallpaper.remove();
+            }
+
+            if (wallpaperPath && String(wallpaperPath).trim() !== '') {
+                var wallpaper = document.createElement('div');
+                wallpaper.className = 'theme-wallpaper';
+                wallpaper.style.backgroundImage = "url('" + wallpaperPath + "')";
+                document.body.prepend(wallpaper);
+            }
+
+            localStorage.setItem('castle-theme', JSON.stringify(theme));
+
+            if (window.startRgbAnimation) {
+                window.startRgbAnimation(theme);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var saved = localStorage.getItem('castle-theme');
+
+            if (saved) {
+                try {
+                    window.applyTheme(JSON.parse(saved));
+                } catch (e) {
+                    localStorage.removeItem('castle-theme');
+                }
+            }
+        });
+
+        // ========== VISUALIZER ==========
+
+        var _visCtx;
+        var _visStyle;
+        var _visColor;
+        var _visSecondary;
+        var _visSpeed;
+        var _visIntensity;
+        var _visAnimFrame;
+        var _bars = [];
+        var _targetBars = [];
+        var _visPosition = 0;
+        var _visDuration = 1;
+        var _visEnergy = 0;
+        var _lastPosition = -1;
+
+        window.startVisualizer = function (config) {
+            var canvas = document.getElementById('np-visualizer');
+
+            if (!canvas) {
+                return;
+            }
+
+            _visCtx = canvas.getContext('2d');
+            _visStyle = config.style || 'bars';
+            _visColor = config.color || '#CC0000';
+            _visSecondary = config.secondary || '#FF0000';
+            _visSpeed = config.speed || 2;
+            _visIntensity = config.intensity || 0.6;
+            _visPosition = 0;
+            _visDuration = 1;
+            _visEnergy = 0;
+            _lastPosition = -1;
+
+            resizeCanvas(canvas);
+            startLoop();
+        };
+
+        function resizeCanvas(canvas) {
+            var dpr = window.devicePixelRatio || 1;
+            var rect = canvas.getBoundingClientRect();
+
+            canvas.width = Math.floor(rect.width * dpr);
+            canvas.height = Math.floor(rect.height * dpr);
+
+            if (_visCtx) {
+                _visCtx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+        }
+
+        window.drawVisualizer = function (fftData, position, duration) {
+            if (duration > 0 && position >= 0) {
+                _visPosition = position || 0;
+                _visDuration = duration || 1;
+
+                if (_visPosition === _lastPosition && _visDuration > 0) {
+                    _visEnergy = Math.max(0, _visEnergy - 0.06);
+                } else {
+                    _visEnergy = Math.min(1, _visEnergy + 0.08);
+                }
+
+                _lastPosition = _visPosition;
+            } else {
+                _visEnergy = Math.max(0, _visEnergy - 0.06);
+            }
+        };
+
+        function startLoop() {
+            if (_visAnimFrame) {
+                cancelAnimationFrame(_visAnimFrame);
+            }
+
+            function draw() {
+                _visAnimFrame = requestAnimationFrame(draw);
+
+                var canvas = document.getElementById('np-visualizer');
+
+                if (!canvas || !_visCtx) {
+                    return;
+                }
+
+                var dpr = window.devicePixelRatio || 1;
+                var rect = canvas.getBoundingClientRect();
+
+                if (canvas.width !== Math.floor(rect.width * dpr) ||
+                    canvas.height !== Math.floor(rect.height * dpr)) {
+                    resizeCanvas(canvas);
+                }
+
+                var w = canvas.width;
+                var h = canvas.height;
+                var intensity = _visIntensity || 0.6;
+                var speed = _visSpeed || 2;
+                var time = Date.now() / 1000;
+                var barCount = 128;
+                var barWidth = w / barCount;
+                var energy = _visEnergy;
+
+                if (_bars.length !== barCount) {
+                    _bars = new Array(barCount).fill(0);
+                    _targetBars = new Array(barCount).fill(0);
+                }
+
+                var progress = _visDuration > 0 ? _visPosition / _visDuration : 0;
+                var beatPulse = 1 + energy * 0.3 * Math.abs(Math.sin(time * 3.5 + progress * 16));
+
+                for (var i = 0; i < barCount; i++) {
+                    var bassBoost = 1 - i / barCount;
+                    var freq1 = Math.sin(i * 0.35 + time * speed * 1.4) * 0.4 * energy;
+                    var freq2 = Math.sin(i * 0.55 + time * speed * 2.1 + progress * 20) * 0.3 * energy;
+                    var freq3 = Math.sin(i * 0.15 + time * speed * 0.6) * 0.25 * energy * bassBoost;
+                    var freq4 = Math.sin(i * 0.7 + time * speed * 3.0) * 0.15 * energy;
+                    var freq5 = Math.cos(i * 0.08 + progress * 35) * 0.2 * energy * bassBoost;
+                    var combined = (freq1 + freq2 + freq3 + freq4 + freq5) * beatPulse;
+
+                    _targetBars[i] = (combined * 0.6 + 0.5 + energy * 0.3 * bassBoost) * h * intensity * 0.8;
+                }
+
+                var smoothing = 0.30;
+
+                for (var j = 0; j < barCount; j++) {
+                    _bars[j] += (_targetBars[j] - _bars[j]) * smoothing;
+                }
+
+                _visCtx.clearRect(0, 0, w, h);
+                _visCtx.shadowBlur = 0;
+                _visCtx.shadowColor = 'transparent';
+
+                for (var k = 0; k < barCount; k++) {
+                    var x = k * barWidth;
+                    var barH = Math.max(2, _bars[k]);
+                    var gradient = _visCtx.createLinearGradient(x, h, x, h - barH);
+
+                    if (_visStyle === 'rainbow') {
+                        var hue = (k * 5 + time * 50) % 360;
+                        gradient.addColorStop(0, 'hsl(' + hue + ',100%,50%)');
+                        gradient.addColorStop(1, 'hsl(' + (hue + 30) + ',100%,70%)');
+                    } else {
+                        gradient.addColorStop(0, _visColor);
+                        gradient.addColorStop(1, _visSecondary);
+                    }
+
+                    _visCtx.fillStyle = gradient;
+                    _visCtx.fillRect(x + 1, h - barH, Math.max(1, barWidth - 2), barH);
+                }
+            }
+
+            draw();
+        }
+
+        window.stopVisualizer = function () {
+            if (_visAnimFrame) {
+                cancelAnimationFrame(_visAnimFrame);
+                _visAnimFrame = null;
+            }
+        };
+
+        window.addEventListener('resize', function () {
+            var canvas = document.getElementById('np-visualizer');
+
+            if (canvas) {
+                resizeCanvas(canvas);
+            }
+        });
+    </script>
+</body>
+</html>

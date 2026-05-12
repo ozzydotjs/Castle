@@ -1,0 +1,388 @@
+@page "/search"
+@using Castle.Core.Services
+@inject SearchService SearchService
+@inject DownloadService DownloadService
+@inject RecommendationService RecommendationService
+@inject DownloadQueueService DownloadQueue
+@inject PlaylistImportService PlaylistImport
+@inject IBlacklistRepository _blacklistRepo
+
+<div class="search-page">
+    @* ========== SEARCH BAR ========== *@
+    <div class="search-hero">
+        <h3><LiSearch Size="20" Stroke="#BBBBBB" /> Search & Download</h3>
+        <div class="search-box">
+            <input @bind="_query" @bind:event="oninput"
+                   placeholder="Search for songs, artists, or albums..."
+                   class="search-input"
+                   @onkeydown="OnSearchKeyDown" />
+            <button @onclick="DoSearch" disabled="@_isSearching" class="search-btn">
+                @(_isSearching ? "Searching..." : "Search")
+            </button>
+        </div>
+        
+        @* Search Suggestions Dropdown *@
+        @if (_showSuggestions && _suggestions.Count > 0)
+        {
+            <div class="search-suggestions">
+                @foreach (var suggestion in _suggestions)
+                {
+                    <div class="suggestion-item" @onclick="() => SelectSuggestion(suggestion)">
+                        <LiSearch Size="14" Stroke="#888" /> @suggestion
+                    </div>
+                }
+            </div>
+        }
+        
+        @* Search History *@
+        @if (!_hasSearched && _searchHistory.Count > 0)
+        {
+            <div class="search-history">
+                <span class="search-history-label">Recent searches</span>
+                <div class="history-chips">
+                    @foreach (var term in _searchHistory)
+                    {
+                        <button @onclick="() => SearchFromHistory(term)" class="history-chip">
+                            <LiClock Size="12" Stroke="#888" /> @term
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_status))
+    {
+        <p class="status-text">@_status</p>
+    }
+
+    @* ========== IMPORT PLAYLIST (Collapsible) ========== *@
+    <div class="collapsible-section">
+        <button @onclick="ToggleImportSection" class="collapsible-header">
+            <LiListMusic Size="16" Stroke="#BBBBBB" /> Import Playlist
+            <span class="collapsible-arrow @(_importExpanded ? "expanded" : "")">▾</span>
+        </button>
+        @if (_importExpanded)
+        {
+            <div class="collapsible-content">
+                <div class="import-box">
+                    <input @bind="_playlistUrl" placeholder="Paste YouTube playlist URL..." class="import-input" />
+                    <button @onclick="ImportPlaylist" disabled="@_isImporting" class="import-btn">
+                        @(_isImporting ? "Importing..." : "Import")
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(_importStatus))
+                {
+                    <p class="status-text">@_importStatus</p>
+                }
+            </div>
+        }
+    </div>
+
+    @* ========== RECOMMENDED FOR YOU (Collapsible) ========== *@
+    <div class="collapsible-section">
+        <button @onclick="ToggleRecsSection" class="collapsible-header">
+            <LiSparkles Size="16" Stroke="#BBBBBB" /> Recommended for You
+            <span class="collapsible-arrow @(_recsExpanded ? "expanded" : "")">▾</span>
+        </button>
+        @if (_recsExpanded)
+        {
+            <div class="collapsible-content">
+                @if (_isLoadingRecs)
+                {
+                    <div class="discover-loading">
+                        @for (int i = 0; i < 4; i++)
+                        {
+                            <div class="skeleton-card"></div>
+                        }
+                    </div>
+                }
+                else if (_recommendations.Count > 0)
+                {
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <button @onclick="RefreshRecommendations" class="plain-refresh-btn" title="Refresh">
+                            <LiRefreshCw Size="14" Stroke="#BBBBBB" /> Refresh
+                        </button>
+                    </div>
+                    <div class="search-results">
+                        @foreach (var rec in _recommendations)
+                        {
+                            <div class="search-result-item">
+                                @if (!string.IsNullOrEmpty(rec.ThumbnailUrl))
+                                {
+                                    <img src="@rec.ThumbnailUrl" class="search-thumb" />
+                                }
+                                <div class="search-info">
+                                    <span class="search-title">@rec.Title</span>
+                                    <span class="search-author">@rec.Author — @rec.Duration</span>
+                                    <span class="rec-reason">@rec.Reason</span>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button @onclick="() => BlacklistRec(rec)" class="blacklist-btn" title="Not Interested">
+                                        <LiEyeOff Size="14" Stroke="#ff4444" />
+                                    </button>
+                                    <button @onclick="() => DownloadDirect(rec)" class="download-btn" title="Download Now">
+                                        <LiDownload Size="14" Stroke="#4caf50" />
+                                    </button>
+                                    <button @onclick="() => AddRecToDownloadQueue(rec)" class="queue-btn" title="Add to Queue">
+                                        <LiListPlus Size="14" Stroke="#BBBBBB" />
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="status-text">Add more music to your library for personalized recommendations.</p>
+                }
+            </div>
+        }
+    </div>
+
+    @* ========== SEARCH RESULTS ========== *@
+    @if (_hasSearched)
+    {
+        <div class="collapsible-section" style="border-color: var(--accent);">
+            <div class="collapsible-header" style="cursor: default;">
+                <LiSearch Size="16" Stroke="#BBBBBB" /> Results for "@_query" (@_results.Count)
+            </div>
+            <div class="collapsible-content">
+                @if (_isSearching)
+                {
+                    <div class="discover-loading">
+                        @for (int i = 0; i < 4; i++)
+                        {
+                            <div class="skeleton-card"></div>
+                        }
+                    </div>
+                }
+                else if (_results.Count == 0)
+                {
+                    <p class="status-text">No results found. Try a different search.</p>
+                }
+                else
+                {
+                    <div class="search-results">
+                        @foreach (var result in _results)
+                        {
+                            <div class="search-result-item">
+                                @if (!string.IsNullOrEmpty(result.ThumbnailUrl))
+                                {
+                                    <img src="@result.ThumbnailUrl" class="search-thumb" />
+                                }
+                                <div class="search-info">
+                                    <span class="search-title">@result.Title</span>
+                                    <span class="search-author">@result.Author — @result.Duration</span>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button @onclick="() => DownloadDirectResult(result)" class="download-btn" title="Download Now">
+                                        <LiDownload Size="14" Stroke="#4caf50" /> Download
+                                    </button>
+                                    <button @onclick="() => AddToDownloadQueue(result)" class="queue-btn" title="Add to Queue">
+                                        <LiListPlus Size="14" Stroke="#BBBBBB" />
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string _query = string.Empty;
+    private string _playlistUrl = "";
+    private bool _isImporting;
+    private string _importStatus = "";
+    private List<SearchResult> _results = new();
+    private List<RecommendedTrack> _recommendations = new();
+    private List<string> _suggestions = new();
+    private List<string> _searchHistory = new();
+    private bool _isSearching;
+    private bool _isLoadingRecs = true;
+    private bool _hasSearched;
+    private string _status = string.Empty;
+    private bool _showSuggestions;
+    private bool _importExpanded;
+    private bool _recsExpanded = true;
+    private CancellationTokenSource? _suggestCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _recsExpanded = true;
+        _importExpanded = false;
+        LoadSearchHistory();
+        
+        try
+        {
+            _isLoadingRecs = true;
+            _recommendations = await RecommendationService.GetRecommendationsAsync(10);
+        }
+        catch { }
+        finally
+        {
+            _isLoadingRecs = false;
+            StateHasChanged();
+        }
+    }
+
+    void LoadSearchHistory()
+    {
+        var history = Preferences.Get("search_history", "");
+        if (!string.IsNullOrEmpty(history))
+            _searchHistory = history.Split('|').Where(s => !string.IsNullOrWhiteSpace(s)).Take(5).ToList();
+    }
+
+    void SaveSearchHistory(string term)
+    {
+        _searchHistory.Remove(term);
+        _searchHistory.Insert(0, term);
+        if (_searchHistory.Count > 5) _searchHistory = _searchHistory.Take(5).ToList();
+        Preferences.Set("search_history", string.Join("|", _searchHistory));
+    }
+
+    async void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await DoSearch();
+            return;
+        }
+        
+        if (_query.Length < 2)
+        {
+            _showSuggestions = false;
+            _suggestions.Clear();
+            return;
+        }
+
+        _suggestCts?.Cancel();
+        _suggestCts = new CancellationTokenSource();
+        var token = _suggestCts.Token;
+
+        await Task.Delay(300);
+        if (token.IsCancellationRequested) return;
+
+        try
+        {
+            _suggestions = await SearchService.GetSuggestionsAsync(_query);
+            _showSuggestions = _suggestions.Count > 0;
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    void SelectSuggestion(string suggestion)
+    {
+        _query = suggestion;
+        _showSuggestions = false;
+        _ = DoSearch();
+    }
+
+    async Task SearchFromHistory(string term)
+    {
+        _query = term;
+        await DoSearch();
+    }
+
+    async Task DoSearch()
+    {
+        if (string.IsNullOrWhiteSpace(_query)) return;
+        _hasSearched = true;
+        _showSuggestions = false;
+        _recsExpanded = false;
+        _isSearching = true;
+        _results.Clear();
+        _status = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            _results = await SearchService.SearchAsync(_query);
+            if (_results.Count == 0) _status = "No results found.";
+            else SaveSearchHistory(_query);
+        }
+        catch (Exception ex)
+        {
+            _status = $"Search error: {ex.Message}";
+        }
+        finally
+        {
+            _isSearching = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task RefreshRecommendations()
+    {
+        _isLoadingRecs = true;
+        _recommendations = new();
+        StateHasChanged();
+        
+        await Task.Delay(300);
+        try { _recommendations = await RecommendationService.GetRecommendationsAsync(10); } catch { }
+        _isLoadingRecs = false;
+        StateHasChanged();
+    }
+
+    async Task ImportPlaylist()
+    {
+        if (string.IsNullOrWhiteSpace(_playlistUrl)) return;
+        _isImporting = true;
+        _importStatus = "Importing...";
+        StateHasChanged();
+
+        try
+        {
+            var result = await PlaylistImport.ImportYouTubePlaylistAsync(_playlistUrl);
+            _importStatus = $"Added {result.count} songs to download queue!";
+            _playlistUrl = "";
+        }
+        catch (Exception ex)
+        {
+            _importStatus = $"Import failed: {ex.Message}";
+        }
+        finally { _isImporting = false; }
+    }
+
+    void ToggleImportSection() => _importExpanded = !_importExpanded;
+    void ToggleRecsSection() => _recsExpanded = !_recsExpanded;
+
+    async void DownloadDirect(RecommendedTrack rec)
+    {
+        _status = $"Downloading: {rec.Title}...";
+        StateHasChanged();
+        try { await DownloadService.DownloadAsync($"https://youtube.com/watch?v={rec.VideoId}", rec.Title, rec.Author); }
+        catch { _status = "Download failed."; }
+    }
+
+    async void DownloadDirectResult(SearchResult result)
+    {
+        _status = $"Downloading: {result.Title}...";
+        StateHasChanged();
+        try { await DownloadService.DownloadAsync($"https://youtube.com/watch?v={result.VideoId}", result.Title, result.Author); }
+        catch { _status = "Download failed."; }
+    }
+
+    void AddToDownloadQueue(SearchResult result)
+    {
+        DownloadQueue.AddToQueue($"https://youtube.com/watch?v={result.VideoId}", result.Title, result.Author);
+        _status = $"Added to queue: {result.Title}";
+    }
+
+    void AddRecToDownloadQueue(RecommendedTrack rec)
+    {
+        DownloadQueue.AddToQueue($"https://youtube.com/watch?v={rec.VideoId}", rec.Title, rec.Author);
+        _status = $"Added to queue: {rec.Title}";
+    }
+
+    async Task BlacklistRec(RecommendedTrack rec)
+    {
+        _blacklistRepo.Add(new Castle.Core.Models.BlacklistEntry { VideoId = rec.VideoId, Artist = rec.Author, Title = rec.Title });
+        _recommendations.Remove(rec);
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,180 @@
+﻿@using Castle.Core.Services
+@using Microsoft.AspNetCore.Components.Routing
+@inject PlaylistService PlaylistService
+@inject ISongRepository SongRepo
+@inject PlaybackService Player
+@inject QueueService QueueService
+@inject NavigationManager Navigation
+
+<div class="sidebar-brand">
+    <img src="skull-logo.png" alt="Castle" />
+    <span class="brand-text">CASTLE</span>
+</div>
+
+<nav class="sidebar-nav">
+    <div class="sidebar-section-label">Music</div>
+    <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+        <LiLibrary Size="18" Stroke="#BBBBBB" /> Library
+    </NavLink>
+    <NavLink class="nav-item" href="dashboard" Match="NavLinkMatch.Prefix">
+        <LiLayoutDashboard Size="18" Stroke="#BBBBBB" /> Dashboard
+    </NavLink>
+    <NavLink class="nav-item" href="nowplaying" Match="NavLinkMatch.Prefix">
+        <LiDisc Size="18" Stroke="#BBBBBB" /> Now Playing
+    </NavLink>
+    <NavLink class="nav-item" href="queue" Match="NavLinkMatch.Prefix">
+        <LiListOrdered Size="18" Stroke="#BBBBBB" /> Queue
+    </NavLink>
+    
+    <div class="sidebar-section-label" style="margin-top: 16px;">Tools</div>
+    <NavLink class="nav-item" href="search" Match="NavLinkMatch.Prefix">
+        <LiSearch Size="18" Stroke="#BBBBBB" /> Search & Download
+    </NavLink>
+    <NavLink class="nav-item" href="equalizer" Match="NavLinkMatch.Prefix">
+        <LiSlidersHorizontal Size="18" Stroke="#BBBBBB" /> Equalizer
+    </NavLink>
+    <NavLink class="nav-item" href="lyrics" Match="NavLinkMatch.Prefix">
+        <LiMusic Size="18" Stroke="#BBBBBB" /> Lyrics
+    </NavLink>
+    <NavLink class="nav-item" href="recentlyplayed" Match="NavLinkMatch.Prefix">
+        <LiClock Size="18" Stroke="#BBBBBB" /> Recently Played
+    </NavLink>
+    
+    <div class="sidebar-section-label" style="margin-top: 16px;">More</div>
+    <NavLink class="nav-item" href="downloadqueue" Match="NavLinkMatch.Prefix">
+        <LiDownload Size="18" Stroke="#BBBBBB" /> Downloads
+    </NavLink>
+    <NavLink class="nav-item" href="sleeptimer" Match="NavLinkMatch.Prefix">
+        <LiMoon Size="18" Stroke="#BBBBBB" /> Sleep Timer
+    </NavLink>
+    <NavLink class="nav-item" href="metadataeditor" Match="NavLinkMatch.Prefix">
+        <LiPencil Size="18" Stroke="#BBBBBB" /> Metadata
+    </NavLink>
+    <NavLink class="nav-item" href="themes" Match="NavLinkMatch.Prefix">
+        <LiPalette Size="18" Stroke="#BBBBBB" /> Themes
+    </NavLink>
+</nav>
+
+<div class="sidebar-divider"></div>
+
+<div class="sidebar-section">
+    <div class="sidebar-section-label">
+        <span>Playlists</span>
+        <button @onclick="CreateNewPlaylist" class="playlist-add-btn" title="New Playlist">
+            <LiPlus Size="16" Stroke="#BBBBBB" />
+        </button>
+    </div>
+
+    @if (_showCreateInput)
+    {
+        <div class="playlist-create">
+            <input @bind="_newPlaylistName" placeholder="Playlist name..." class="playlist-input" />
+            <button @onclick="SavePlaylist" class="playlist-save-btn" title="Save">
+                <LiCheck Size="14" Stroke="#4caf50" />
+            </button>
+            <button @onclick="CancelCreate" class="playlist-cancel-btn" title="Cancel">
+                <LiX Size="14" Stroke="#ff4444" />
+            </button>
+        </div>
+    }
+
+    <ul class="playlist-list">
+        @foreach (var playlist in _playlists)
+        {
+            <li @onclick="() => OpenPlaylist(playlist.Id)"
+                @oncontextmenu="(e) => OpenPlaylistContextMenu(e, playlist)"
+                @oncontextmenu:preventDefault="true"
+                class="playlist-item @(PlaylistService.CurrentPlaylist?.Id == playlist.Id ? "active" : "")">
+                <LiListMusic Size="14" Stroke="#BBBBBB" /> @playlist.Name
+                <button @onclick="() => DeletePlaylist(playlist.Id)"
+                        @onclick:stopPropagation="true"
+                        class="playlist-delete-btn" title="Delete">
+                    <LiTrash2 Size="14" Stroke="#BBBBBB" />
+                </button>
+            </li>
+        }
+    </ul>
+</div>
+
+@if (_playlistContextVisible)
+{
+    <div class="context-menu" style="left: @(_contextX)px; top: @(_contextY)px;">
+        <div class="context-item" @onclick="() => { OpenPlaylist(_contextPlaylist!.Id); ClosePlaylistContext(); }">📋 Open</div>
+        <div class="context-item" @onclick="() => { QueuePlaylist(_contextPlaylist!.Id); ClosePlaylistContext(); }">➕ Add to Queue</div>
+        <div class="context-separator"></div>
+        <div class="context-item" @onclick="() => { DeletePlaylist(_contextPlaylist!.Id); ClosePlaylistContext(); }">🗑 Delete</div>
+    </div>
+    <div class="context-overlay" @onclick="ClosePlaylistContext"></div>
+}
+
+@code {
+    private List<Castle.Core.Models.Playlist> _playlists = new();
+    private bool _showCreateInput;
+    private string _newPlaylistName = string.Empty;
+    private bool _playlistContextVisible;
+    private double _contextX, _contextY;
+    private Castle.Core.Models.Playlist? _contextPlaylist;
+
+    protected override void OnInitialized()
+    {
+        LoadPlaylists();
+        PlaylistService.PlaylistChanged += () => InvokeAsync(() => { LoadPlaylists(); StateHasChanged(); });
+    }
+
+    void LoadPlaylists() => _playlists = PlaylistService.GetAllPlaylists();
+    void CreateNewPlaylist() { _showCreateInput = true; _newPlaylistName = string.Empty; }
+
+    void SavePlaylist()
+    {
+        if (!string.IsNullOrWhiteSpace(_newPlaylistName))
+        {
+            PlaylistService.CreatePlaylist(_newPlaylistName);
+            _showCreateInput = false;
+            LoadPlaylists();
+        }
+    }
+
+    void CancelCreate() => _showCreateInput = false;
+    void OpenPlaylist(string id) => Navigation.NavigateTo($"/playlist/{id}");
+
+    void DeletePlaylist(string id)
+    {
+        PlaylistService.DeletePlaylist(id);
+        LoadPlaylists();
+        ClosePlaylistContext();
+    }
+
+    void QueuePlaylist(string id)
+    {
+        var playlist = PlaylistService.GetPlaylistById(id);
+        if (playlist != null)
+        {
+            var songs = playlist.SongIds
+                .Select(sid => SongRepo.GetById(sid))
+                .Where(s => s != null)
+                .Cast<Castle.Core.Models.Song>()
+                .ToList();
+
+            foreach (var song in songs)
+                QueueService.Add(song);
+
+            if (!Player.IsPlaying && songs.Count > 0)
+                Player.PlaySong(songs[0]);
+        }
+        ClosePlaylistContext();
+    }
+
+    void OpenPlaylistContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Castle.Core.Models.Playlist playlist)
+    {
+        _contextPlaylist = playlist;
+        _contextX = e.ClientX;
+        _contextY = e.ClientY;
+        _playlistContextVisible = true;
+    }
+
+    void ClosePlaylistContext() { _playlistContextVisible = false; _contextPlaylist = null; }
+}
+<NavLink class="nav-item" href="updates">
+    <LiDownloadCloud Size="18" Stroke="var(--icon-default)" />
+    <span>Updates</span>
+</NavLink>

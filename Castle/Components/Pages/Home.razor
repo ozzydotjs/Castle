@@ -1,0 +1,464 @@
+﻿@page "/"
+@using Castle.Core.Interfaces
+@using Castle.Core.Models
+@using Castle.Core.Services
+@implements IDisposable
+@inject ISongRepository Repository
+@inject Castle.Services.SettingsService Settings
+@inject ILibraryScanner Scanner
+@inject PlaybackService Player
+@inject QueueService Queue
+@inject PlaylistService PlaylistService
+@inject IPlaylistRepository PlaylistRepo
+@inject DiscoverService DiscoverService
+@inject DownloadQueueService DownloadQueue
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+@* ========== DAILY DISCOVER ========== *@
+@if (_loadingDiscover)
+{
+    <div class="discover-section">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 style="margin: 0;"><LiSparkles Size="18" Stroke="#BBBBBB" /> Your Daily Discover</h3>
+        </div>
+        <div class="discover-loading">
+            @for (int i = 0; i < 6; i++)
+            {
+                <div class="skeleton-card"></div>
+            }
+        </div>
+    </div>
+}
+else if (_dailyDiscover.Count > 0)
+{
+    <div class="discover-section">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 style="margin: 0;"><LiSparkles Size="18" Stroke="#BBBBBB" /> Your Daily Discover</h3>
+            <button @onclick="RefreshDiscover" class="plain-refresh-btn" title="Refresh">
+                <LiRefreshCw Size="16" Stroke="#BBBBBB" />
+            </button>
+        </div>
+        <div class="suggested-grid">
+            @foreach (var rec in _dailyDiscover)
+            {
+                <div class="suggested-card">
+                    @if (!string.IsNullOrEmpty(rec.ThumbnailUrl))
+                    {
+                        <img src="@rec.ThumbnailUrl" class="card-cover" />
+                    }
+                    else
+                    {
+                        <div class="card-cover-placeholder"><LiMusic Size="24" Stroke="#555" /></div>
+                    }
+                    <div class="card-title">@rec.Title</div>
+                    <div class="card-subtitle">@rec.Author</div>
+                    <button @onclick="() => DownloadDiscover(rec)" class="card-download-btn" title="Download">
+                        <LiDownload Size="14" Stroke="#4caf50" />
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@* ========== PLAYLISTS FOR YOU ========== *@
+@if (_loadingForYou)
+{
+    <div class="discover-section">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 style="margin: 0;"><LiHeart Size="18" Stroke="#BBBBBB" /> Playlists for You</h3>
+        </div>
+        <div class="discover-loading">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="skeleton-playlist"></div>
+            }
+        </div>
+    </div>
+}
+else if (_playlistsForYou.Count > 0)
+{
+    <div class="discover-section">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 style="margin: 0;"><LiHeart Size="18" Stroke="#BBBBBB" /> Playlists for You</h3>
+            <button @onclick="RefreshForYou" class="plain-refresh-btn" title="Refresh">
+                <LiRefreshCw Size="16" Stroke="#BBBBBB" />
+            </button>
+        </div>
+        <div class="playlist-grid">
+            @foreach (var playlist in _playlistsForYou)
+            {
+                <div class="playlist-card" @onclick="() => SearchPlaylist(playlist.Query, playlist.Name)">
+                    @if (!string.IsNullOrEmpty(playlist.ThumbnailUrl))
+                    {
+                        <img src="@playlist.ThumbnailUrl" class="playlist-card-cover" />
+                    }
+                    else
+                    {
+                        <div class="playlist-card-placeholder"><LiListMusic Size="24" Stroke="#555" /></div>
+                    }
+                    <div class="playlist-card-name">@playlist.Name</div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@* ========== POPULAR PLAYLISTS ========== *@
+@if (_loadingPopular)
+{
+    <div class="discover-section">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 style="margin: 0;"><LiTrendingUp Size="18" Stroke="#BBBBBB" /> Popular Playlists</h3>
+        </div>
+        <div class="discover-loading">
+            @for (int i = 0; i < 6; i++)
+            {
+                <div class="skeleton-playlist"></div>
+            }
+        </div>
+    </div>
+}
+else if (_popularPlaylists.Count > 0)
+{
+    <div class="discover-section">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 style="margin: 0;"><LiTrendingUp Size="18" Stroke="#BBBBBB" /> Popular Playlists</h3>
+            <button @onclick="RefreshPopular" class="plain-refresh-btn" title="Refresh">
+                <LiRefreshCw Size="16" Stroke="#BBBBBB" />
+            </button>
+        </div>
+        <div class="playlist-grid">
+            @foreach (var playlist in _popularPlaylists)
+            {
+                <div class="playlist-card" @onclick="() => SearchPlaylist(playlist.Query, playlist.Name)">
+                    @if (!string.IsNullOrEmpty(playlist.ThumbnailUrl))
+                    {
+                        <img src="@playlist.ThumbnailUrl" class="playlist-card-cover" />
+                    }
+                    else
+                    {
+                        <div class="playlist-card-placeholder"><LiListMusic Size="24" Stroke="#555" /></div>
+                    }
+                    <div class="playlist-card-name">@playlist.Name</div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@* ========== YOUR LIBRARY ========== *@
+<div class="library-header">
+    <h3>Your Library (@_songs.Count SONGS)</h3>
+    <div class="top-bar">
+        <button @onclick="ScanLibrary" disabled="@_isScanning">
+            <LiFolderSync Size="16" Stroke="#FFFFFF" /> @(_isScanning ? "Scanning..." : (Settings.HasScanned ? "Re-scan Folder" : "Scan Music Folder"))
+        </button>
+        <button @onclick="PlayAll" disabled="@(_songs.Count == 0)">
+            <LiPlay Size="16" Stroke="#FFFFFF" /> Play All
+        </button>
+        <button @onclick="ClearLibrary" disabled="@(_songs.Count == 0)">
+            <LiTrash2 Size="16" Stroke="#FFFFFF" /> Clear
+        </button>
+        <button @onclick="ToggleFavoritesFilter" class="@(_showFavoritesOnly ? "filter-active" : "")">
+            <LiHeart Size="16" Stroke="#FFFFFF" /> @(_showFavoritesOnly ? "Favorites" : "All Songs")
+        </button>
+    </div>
+</div>
+
+@if (_progress > 0 && _progress < 100)
+{
+    <div class="progress-wrap"><div class="progress-fill" style="width: @(_progress)%;"></div></div>
+}
+
+@if (_songs.Count > 0)
+{
+    <div class="sort-headers">
+        <button class="sort-btn" @onclick="() => ToggleSort(nameof(Song.Title))">Title @SortArrow(nameof(Song.Title))</button>
+        <button class="sort-btn" @onclick="() => ToggleSort(nameof(Song.Artist))">Artist @SortArrow(nameof(Song.Artist))</button>
+        <button class="sort-btn" @onclick="() => ToggleSort(nameof(Song.Album))">Album @SortArrow(nameof(Song.Album))</button>
+        <button class="sort-btn" @onclick="() => ToggleSort(nameof(Song.Duration))">Duration @SortArrow(nameof(Song.Duration))</button>
+    </div>
+
+    <ul class="song-list">
+        @foreach (var song in _sortedSongs.Take(_visibleCount))
+        {
+            <li @onclick="() => PlaySong(song)"
+                @oncontextmenu="(e) => OpenContextMenu(e, song)"
+                class="@(GetActiveClass(song))">
+                @if (!string.IsNullOrEmpty(song.CoverArtPath))
+                {
+                    <img src="@GetCoverUrl(song.CoverArtPath)" class="song-cover" />
+                }
+                else
+                {
+                    <span class="song-cover-placeholder"><LiMusic Size="16" Stroke="#555" /></span>
+                }
+                <span @onclick="() => ToggleFavorite(song)" @onclick:stopPropagation="true" class="fav-star">
+                    @(song.IsFavorite ? "❤️" : "🤍")
+                </span>
+                <span class="song-info">
+                    <span class="song-title">@song.Title</span>
+                    <span class="song-artist">@song.Artist</span>
+                </span>
+                <span class="song-duration">@FormatDuration(song.Duration)</span>
+            </li>
+        }
+    </ul>
+
+    @if (_hasMoreSongs)
+    {
+        <button @onclick="LoadMore" class="load-more-btn">
+            Load More (@(_sortedSongs.Count - _visibleCount) remaining)
+        </button>
+    }
+}
+else if (!_isScanning && !_isLoading)
+{
+    <div class="empty-state">
+        <LiMusic Size="48" Stroke="#555" />
+        <h3>Your library is empty</h3>
+        <p class="status-text">Scan a music folder or download songs to get started.</p>
+    </div>
+}
+
+@if (_contextMenuVisible)
+{
+    <div class="context-menu" style="left: @(_contextX)px; top: @(_contextY)px;" @key="_contextSong?.Id">
+        @if (!_showPlaylistSubmenu)
+        {
+            <div class="context-item" @onclick="() => { PlaySong(_contextSong!); CloseContextMenu(); }"><LiPlay Size="14" Stroke="#BBBBBB" /> Play</div>
+            <div class="context-item" @onclick="() => { Player.PlayQueue(new List<Song> { _contextSong! }, 0); CloseContextMenu(); }"><LiSkipForward Size="14" Stroke="#BBBBBB" /> Play Next</div>
+            <div class="context-item" @onclick="() => { Queue.Add(_contextSong!); if (!Player.IsPlaying) Player.PlaySong(_contextSong!); CloseContextMenu(); }">
+                <LiListPlus Size="14" Stroke="#BBBBBB" /> Add to Queue
+            </div>
+            <div class="context-item" @onclick="() => { ToggleFavorite(_contextSong!); CloseContextMenu(); }">
+                @(_contextSong?.IsFavorite == true ? "💔 Unfavorite" : "❤️ Favorite")
+            </div>
+            <div class="context-separator"></div>
+            <div class="context-item" @onclick="OpenPlaylistSubmenu"><LiListMusic Size="14" Stroke="#BBBBBB" /> Add to Playlist ▸</div>
+            <div class="context-separator"></div>
+            <div class="context-item" @onclick="CloseContextMenu"><LiX Size="14" Stroke="#BBBBBB" /> Close</div>
+        }
+        else
+        {
+            <div class="context-item context-back" @onclick="ClosePlaylistSubmenu"><LiArrowLeft Size="14" Stroke="#BBBBBB" /> Back</div>
+            <div class="context-separator"></div>
+            @if (_allPlaylists.Count == 0)
+            {
+                <div class="context-item disabled">No playlists yet</div>
+            }
+            else
+            {
+                @foreach (var playlist in _allPlaylists)
+                {
+                    <div class="context-item" @onclick="() => { PlaylistRepo.AddSong(playlist.Id, _contextSong!.Id); CloseContextMenu(); }">
+                        <LiListMusic Size="14" Stroke="#BBBBBB" /> @playlist.Name
+                    </div>
+                }
+            }
+        }
+    </div>
+    <div class="context-overlay" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"></div>
+}
+
+@code {
+    private List<Song> _songs = new();
+    private List<Song> _sortedSongs = new();
+    private int _progress;
+    private bool _isScanning;
+    private bool _isLoading = true;
+    private string _currentFilePath = string.Empty;
+    private string _sortField = "";
+    private bool _sortAscending = true;
+    private bool _showFavoritesOnly;
+    private List<Playlist> _allPlaylists = new();
+    private bool _contextMenuVisible;
+    private bool _showPlaylistSubmenu;
+    private double _contextX, _contextY;
+    private Song? _contextSong;
+    private int _visibleCount = 50;
+    private bool _hasMoreSongs => _sortedSongs.Count > _visibleCount;
+    private List<RecommendedTrack> _dailyDiscover = new();
+    private List<PopularPlaylist> _popularPlaylists = new();
+    private List<PopularPlaylist> _playlistsForYou = new();
+    private bool _loadingDiscover;
+    private bool _loadingPopular;
+    private bool _loadingForYou;
+
+    protected override void OnInitialized()
+    {
+        LoadLibrary();
+        Player.StateChanged += Refresh;
+        Queue.QueueChanged += Refresh;
+        _ = LoadDiscoverAsync();
+    }
+
+    async Task LoadDiscoverAsync()
+    {
+        _loadingDiscover = true;
+        _loadingPopular = true;
+        _loadingForYou = true;
+        StateHasChanged();
+
+        _dailyDiscover = await DiscoverService.GetDailyDiscoverAsync(6);
+        _loadingDiscover = false;
+        StateHasChanged();
+
+        _popularPlaylists = await DiscoverService.GetPopularPlaylistsAsync();
+        _loadingPopular = false;
+        StateHasChanged();
+
+        _playlistsForYou = await DiscoverService.GetPlaylistsForYouAsync();
+        _loadingForYou = false;
+        StateHasChanged();
+    }
+
+    async Task RefreshDiscover()
+    {
+        DiscoverService.RefreshCache();
+        _dailyDiscover = new();
+        _loadingDiscover = true;
+        StateHasChanged();
+        
+        var delayTask = Task.Delay(400);
+        var dataTask = DiscoverService.GetDailyDiscoverAsync(6);
+        await Task.WhenAll(delayTask, dataTask);
+        
+        _dailyDiscover = await dataTask;
+        _loadingDiscover = false;
+        StateHasChanged();
+    }
+
+    async Task RefreshPopular()
+    {
+        DiscoverService.RefreshCache();
+        _popularPlaylists = new();
+        _loadingPopular = true;
+        StateHasChanged();
+        
+        var delayTask = Task.Delay(400);
+        var dataTask = DiscoverService.GetPopularPlaylistsAsync();
+        await Task.WhenAll(delayTask, dataTask);
+        
+        _popularPlaylists = await dataTask;
+        _loadingPopular = false;
+        StateHasChanged();
+    }
+
+    async Task RefreshForYou()
+    {
+        DiscoverService.RefreshCache();
+        _playlistsForYou = new();
+        _loadingForYou = true;
+        StateHasChanged();
+        
+        var delayTask = Task.Delay(400);
+        var dataTask = DiscoverService.GetPlaylistsForYouAsync();
+        await Task.WhenAll(delayTask, dataTask);
+        
+        _playlistsForYou = await dataTask;
+        _loadingForYou = false;
+        StateHasChanged();
+    }
+
+    void Refresh() { _currentFilePath = Queue.CurrentSong?.FilePath ?? string.Empty; InvokeAsync(StateHasChanged); }
+    string GetActiveClass(Song song) => song.FilePath == _currentFilePath ? "active" : "";
+
+    string GetCoverUrl(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return "";
+        if (path.Contains("wwwroot")) { var fn = Path.GetFileName(path); return $"covers/{fn}"; }
+        if (File.Exists(path)) return $"file:///{path.Replace("\\", "/")}";
+        return "";
+    }
+
+    void PlaySong(Song song) { Player.PlaySong(song); _currentFilePath = song.FilePath; ScrollToActiveSong(); }
+    async void ScrollToActiveSong() { try { await JS.InvokeVoidAsync("scrollToActive", "song-list"); } catch { } }
+
+    void ToggleFavorite(Song song)
+    {
+        var dbSong = Repository.GetByFilePath(song.FilePath);
+        if (dbSong != null) { dbSong.IsFavorite = !dbSong.IsFavorite; Repository.Update(dbSong); LoadLibrary(); }
+    }
+
+    void ToggleFavoritesFilter() { _showFavoritesOnly = !_showFavoritesOnly; LoadLibrary(); }
+
+    void DownloadDiscover(RecommendedTrack rec)
+    {
+        DownloadQueue.AddToQueue($"https://youtube.com/watch?v={rec.VideoId}", rec.Title, rec.Author);
+    }
+
+    void SearchPlaylist(string query, string name)
+    {
+        NavigationManager.NavigateTo($"/playlist-preview?query={Uri.EscapeDataString(query)}&name={Uri.EscapeDataString(name)}");
+    }
+
+    void OpenContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Song song)
+    {
+        _contextSong = song; _contextX = e.ClientX; _contextY = e.ClientY;
+        _contextMenuVisible = true; _showPlaylistSubmenu = false;
+        _allPlaylists = PlaylistService.GetAllPlaylists();
+        StateHasChanged();
+    }
+
+    void OpenPlaylistSubmenu() { _showPlaylistSubmenu = true; _allPlaylists = PlaylistService.GetAllPlaylists(); }
+    void ClosePlaylistSubmenu() { _showPlaylistSubmenu = false; }
+    void CloseContextMenu() { _contextMenuVisible = false; _showPlaylistSubmenu = false; _contextSong = null; }
+
+    void LoadLibrary()
+    {
+        var songs = _showFavoritesOnly ? Repository.GetFavorites() : Repository.GetAll();
+        _songs = songs;
+        _visibleCount = 50;
+        _isLoading = false;
+        ApplySort();
+    }
+
+    void LoadMore() => _visibleCount = Math.Min(_visibleCount + 50, _sortedSongs.Count);
+
+    void ToggleSort(string field)
+    {
+        if (_sortField == field) _sortAscending = !_sortAscending;
+        else { _sortField = field; _sortAscending = true; }
+        ApplySort();
+    }
+
+    string SortArrow(string field) => _sortField != field ? "" : _sortAscending ? "▲" : "▼";
+
+    void ApplySort()
+    {
+        _sortedSongs = _sortField switch
+        {
+            nameof(Song.Title) => _sortAscending ? _songs.OrderBy(s => s.Title).ToList() : _songs.OrderByDescending(s => s.Title).ToList(),
+            nameof(Song.Artist) => _sortAscending ? _songs.OrderBy(s => s.Artist).ToList() : _songs.OrderByDescending(s => s.Artist).ToList(),
+            nameof(Song.Album) => _sortAscending ? _songs.OrderBy(s => s.Album).ToList() : _songs.OrderByDescending(s => s.Album).ToList(),
+            nameof(Song.Duration) => _sortAscending ? _songs.OrderBy(s => s.Duration).ToList() : _songs.OrderByDescending(s => s.Duration).ToList(),
+            _ => new List<Song>(_songs)
+        };
+    }
+
+    string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1) return string.Format("{0}:{1:D2}:{2:D2}", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
+        return string.Format("{0}:{1:D2}", duration.Minutes, duration.Seconds);
+    }
+
+    async Task ScanLibrary()
+    {
+        _isScanning = true; _progress = 0;
+        var progress = new Progress<int>(p => { _progress = p; StateHasChanged(); });
+        string path = Settings.MusicFolderPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        var songs = await Scanner.ScanFolderAsync(path, progress);
+        Repository.DeleteAll(); Repository.InsertBatch(songs);
+        _songs = Repository.GetAll(); ApplySort();
+        Settings.MusicFolderPath = path; Settings.HasScanned = true;
+        _isScanning = false;
+    }
+
+    void PlayAll() { if (_songs.Count > 0) Player.PlayQueue(_songs, 0); }
+    void ClearLibrary() { Repository.DeleteAll(); _songs.Clear(); _sortedSongs.Clear(); Settings.HasScanned = false; }
+
+    public void Dispose() { Player.StateChanged -= Refresh; Queue.QueueChanged -= Refresh; }
+}

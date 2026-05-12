@@ -1,0 +1,473 @@
+﻿@inherits LayoutComponentBase
+@using Castle.Core.Services
+@using Castle.Core.Models
+@using System.Timers
+@implements IDisposable
+@inject PlaybackService Player
+@inject QueueService Queue
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@if (Navigation.Uri.Contains("/nowplaying"))
+{
+    <main style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; z-index: 100; background: var(--bg-primary); margin: 0; padding: 0; border: none;">
+        @Body
+    </main>
+}
+else
+{
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <article class="content">
+                @Body
+            </article>
+        </main>
+    </div>
+}
+
+@if (Queue.CurrentSong != null && !Navigation.Uri.Contains("/nowplaying"))
+{
+    @if (_playerMode == PlayerDockMode.Normal)
+    {
+        <div class="player-bar @(Player.IsPlaying ? "playing" : "")">
+            <div class="player-bar-inner">
+                <div class="player-left" @onclick="NavigateToNowPlaying" style="cursor: pointer;" title="Open Now Playing">
+                    @if (!string.IsNullOrEmpty(Queue.CurrentSong.CoverArtPath))
+                    {
+                        <img src="@GetCoverUrl(Queue.CurrentSong.CoverArtPath)" class="player-cover" />
+                    }
+                    else
+                    {
+                        <div class="player-cover-placeholder">
+                            <LiMusic Size="20" Stroke="#999" />
+                        </div>
+                    }
+
+                    <div class="player-text">
+                        <strong>@Queue.CurrentSong.Title</strong>
+                        <span class="player-artist">@Queue.CurrentSong.Artist</span>
+                    </div>
+
+                    <span style="margin-left: 8px; color: var(--text-secondary);" title="Now Playing">
+                        <LiMaximize2 Size="14" Stroke="#999" />
+                    </span>
+                </div>
+
+                <div class="player-center">
+                    <div class="player-buttons">
+                        <button @onclick="() => Player.Previous()" class="ctrl-btn" title="Previous">
+                            <LiSkipBack Size="18" Stroke="#BBBBBB" />
+                        </button>
+
+                        <button @onclick="() => Player.PlayPause()" class="ctrl-btn ctrl-play" title="Play/Pause">
+                            @if (Player.IsPlaying)
+                            {
+                                <LiPause Size="20" Stroke="#FFFFFF" />
+                            }
+                            else
+                            {
+                                <LiPlay Size="20" Stroke="#FFFFFF" />
+                            }
+                        </button>
+
+                        <button @onclick="() => Player.Next()" class="ctrl-btn" title="Next">
+                            <LiSkipForward Size="18" Stroke="#BBBBBB" />
+                        </button>
+                    </div>
+
+                    <div class="player-seek">
+                        <span>@FormatTime(_currentPosition)</span>
+
+                        <input type="range"
+                               min="0"
+                               max="@((int)_duration)"
+                               step="1"
+                               value="@((int)_currentPosition)"
+                               @oninput="OnSeek" />
+
+                        <span>@FormatTime(_duration)</span>
+                    </div>
+                </div>
+
+                <div class="player-right">
+                    <button @onclick="ToggleFavorite" class="mode-btn @(_isFavorite ? "active" : "")" title="Favorite">
+                        <LiHeart Size="16"
+                                 Stroke="@(_isFavorite ? "#FF0000" : "#BBBBBB")"
+                                 Fill="@(_isFavorite ? "#FF0000" : "none")" />
+                    </button>
+
+                    <button @onclick="ToggleCompressor" class="mode-btn @(_compressorOn ? "active" : "")" title="Volume Normalization">
+                        <LiEqual Size="16" Stroke="#BBBBBB" />
+                    </button>
+
+                    <button @onclick="() => Queue.ToggleShuffle()" class="mode-btn @(Queue.IsShuffled ? "active" : "")" title="Shuffle">
+                        <LiShuffle Size="16" Stroke="#BBBBBB" />
+                    </button>
+
+                    <button @onclick="() => Queue.CycleRepeat()" class="mode-btn @(Queue.Repeat != RepeatMode.Off ? "active" : "")" title="Repeat">
+                        @if (Queue.Repeat == RepeatMode.RepeatOne)
+                        {
+                            <LiRepeat1 Size="16" Stroke="#BBBBBB" />
+                        }
+                        else
+                        {
+                            <LiRepeat Size="16" Stroke="#BBBBBB" />
+                        }
+                    </button>
+
+                    <LiVolume2 Size="16" Stroke="#BBBBBB" />
+
+                    <input type="range"
+                           min="0"
+                           max="100"
+                           value="@((int)(Player.GetVolume() * 100))"
+                           @oninput="OnVolumeChange"
+                           class="volume-slider" />
+                </div>
+
+                <div class="player-dock-actions">
+                    <button @onclick="SetMinimizedMode" class="player-window-btn" title="Minimize player">
+                        —
+                    </button>
+
+                    <button @onclick="SetPopoutMode" class="player-window-btn" title="Pop out player">
+                        <LiMaximize2 Size="14" Stroke="#BBBBBB" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    else if (_playerMode == PlayerDockMode.Minimized)
+    {
+        <div class="player-mini-pill @(Player.IsPlaying ? "playing" : "")">
+            <div class="player-mini-left" @onclick="NavigateToNowPlaying" title="Open Now Playing">
+                @if (!string.IsNullOrEmpty(Queue.CurrentSong.CoverArtPath))
+                {
+                    <img src="@GetCoverUrl(Queue.CurrentSong.CoverArtPath)" class="player-mini-cover" />
+                }
+                else
+                {
+                    <div class="player-mini-cover-placeholder">
+                        <LiMusic Size="16" Stroke="#999" />
+                    </div>
+                }
+
+                <div class="player-mini-text">
+                    <strong>@Queue.CurrentSong.Title</strong>
+                    <span>@Queue.CurrentSong.Artist</span>
+                </div>
+            </div>
+
+            <div class="player-mini-actions">
+                <button @onclick="() => Player.Previous()" class="player-mini-btn" title="Previous">
+                    <LiSkipBack Size="15" Stroke="#BBBBBB" />
+                </button>
+
+                <button @onclick="() => Player.PlayPause()" class="player-mini-play" title="Play/Pause">
+                    @if (Player.IsPlaying)
+                    {
+                        <LiPause Size="17" Stroke="#FFFFFF" />
+                    }
+                    else
+                    {
+                        <LiPlay Size="17" Stroke="#FFFFFF" />
+                    }
+                </button>
+
+                <button @onclick="() => Player.Next()" class="player-mini-btn" title="Next">
+                    <LiSkipForward Size="15" Stroke="#BBBBBB" />
+                </button>
+
+                <button @onclick="SetNormalMode" class="player-mini-btn" title="Restore bottom player">
+                    ⬆
+                </button>
+
+                <button @onclick="SetPopoutMode" class="player-mini-btn" title="Pop out player">
+                    <LiMaximize2 Size="14" Stroke="#BBBBBB" />
+                </button>
+            </div>
+        </div>
+    }
+    else if (_playerMode == PlayerDockMode.Popout)
+    {
+        <div class="player-popout-card @(Player.IsPlaying ? "playing" : "")">
+            <div class="player-popout-top">
+                <span>Now Playing</span>
+
+                <div class="player-popout-window-actions">
+                    <button @onclick="SetMinimizedMode" class="player-window-btn" title="Minimize player">
+                        —
+                    </button>
+
+                    <button @onclick="SetNormalMode" class="player-window-btn" title="Dock player">
+                        Dock
+                    </button>
+                </div>
+            </div>
+
+            <div class="player-popout-main">
+                <div class="player-popout-cover-wrap" @onclick="NavigateToNowPlaying" title="Open Now Playing">
+                    @if (!string.IsNullOrEmpty(Queue.CurrentSong.CoverArtPath))
+                    {
+                        <img src="@GetCoverUrl(Queue.CurrentSong.CoverArtPath)" class="player-popout-cover" />
+                    }
+                    else
+                    {
+                        <div class="player-popout-cover-placeholder">
+                            <LiMusic Size="42" Stroke="#999" />
+                        </div>
+                    }
+                </div>
+
+                <div class="player-popout-info">
+                    <h4>@Queue.CurrentSong.Title</h4>
+                    <p>@Queue.CurrentSong.Artist</p>
+                </div>
+
+                <div class="player-popout-seek">
+                    <span>@FormatTime(_currentPosition)</span>
+
+                    <input type="range"
+                           min="0"
+                           max="@((int)_duration)"
+                           step="1"
+                           value="@((int)_currentPosition)"
+                           @oninput="OnSeek" />
+
+                    <span>@FormatTime(_duration)</span>
+                </div>
+
+                <div class="player-popout-controls">
+                    <button @onclick="() => Queue.ToggleShuffle()" class="mode-btn @(Queue.IsShuffled ? "active" : "")" title="Shuffle">
+                        <LiShuffle Size="16" Stroke="#BBBBBB" />
+                    </button>
+
+                    <button @onclick="() => Player.Previous()" class="ctrl-btn" title="Previous">
+                        <LiSkipBack Size="22" Stroke="#FFFFFF" />
+                    </button>
+
+                    <button @onclick="() => Player.PlayPause()" class="ctrl-btn ctrl-play player-popout-play" title="Play/Pause">
+                        @if (Player.IsPlaying)
+                        {
+                            <LiPause Size="26" Stroke="#FFFFFF" />
+                        }
+                        else
+                        {
+                            <LiPlay Size="26" Stroke="#FFFFFF" />
+                        }
+                    </button>
+
+                    <button @onclick="() => Player.Next()" class="ctrl-btn" title="Next">
+                        <LiSkipForward Size="22" Stroke="#FFFFFF" />
+                    </button>
+
+                    <button @onclick="() => Queue.CycleRepeat()" class="mode-btn @(Queue.Repeat != RepeatMode.Off ? "active" : "")" title="Repeat">
+                        @if (Queue.Repeat == RepeatMode.RepeatOne)
+                        {
+                            <LiRepeat1 Size="16" Stroke="#BBBBBB" />
+                        }
+                        else
+                        {
+                            <LiRepeat Size="16" Stroke="#BBBBBB" />
+                        }
+                    </button>
+                </div>
+
+                <div class="player-popout-bottom">
+                    <button @onclick="ToggleFavorite" class="mode-btn @(_isFavorite ? "active" : "")" title="Favorite">
+                        <LiHeart Size="16"
+                                 Stroke="@(_isFavorite ? "#FF0000" : "#BBBBBB")"
+                                 Fill="@(_isFavorite ? "#FF0000" : "none")" />
+                    </button>
+
+                    <button @onclick="ToggleCompressor" class="mode-btn @(_compressorOn ? "active" : "")" title="Volume Normalization">
+                        <LiEqual Size="16" Stroke="#BBBBBB" />
+                    </button>
+
+                    <LiVolume2 Size="16" Stroke="#BBBBBB" />
+
+                    <input type="range"
+                           min="0"
+                           max="100"
+                           value="@((int)(Player.GetVolume() * 100))"
+                           @oninput="OnVolumeChange"
+                           class="volume-slider" />
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private enum PlayerDockMode
+    {
+        Normal,
+        Minimized,
+        Popout
+    }
+
+    private double _currentPosition;
+    private double _duration;
+    private System.Timers.Timer? _timer;
+    private bool _initialized;
+    private bool _compressorOn;
+    private bool _isFavorite;
+    private string? _lastFavoriteCheck = "";
+    private PlayerDockMode _playerMode = PlayerDockMode.Normal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Player.StateChanged += () => InvokeAsync(StateHasChanged);
+
+        Queue.QueueChanged += () => InvokeAsync(async () =>
+        {
+            UpdateWindowTitle();
+            _isFavorite = Player.IsCurrentSongFavorite();
+            _lastFavoriteCheck = Queue.CurrentSong?.FilePath;
+            await JS.InvokeVoidAsync("animateCoverPulse");
+            StateHasChanged();
+        });
+
+        await JS.InvokeVoidAsync("addKeyboardListener");
+        UpdateWindowTitle();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+
+            _timer = new System.Timers.Timer(100);
+            _timer.Elapsed += async (_, _) =>
+            {
+                try
+                {
+                    await InvokeAsync(UpdatePosition);
+                }
+                catch
+                {
+                }
+            };
+
+            _timer.AutoReset = true;
+            _timer.Start();
+        }
+    }
+
+    private void NavigateToNowPlaying()
+    {
+        Navigation.NavigateTo("/nowplaying");
+    }
+
+    private void SetNormalMode()
+    {
+        _playerMode = PlayerDockMode.Normal;
+    }
+
+    private void SetMinimizedMode()
+    {
+        _playerMode = PlayerDockMode.Minimized;
+    }
+
+    private void SetPopoutMode()
+    {
+        _playerMode = PlayerDockMode.Popout;
+    }
+
+    private void UpdateWindowTitle()
+    {
+        if (Queue.CurrentSong != null)
+        {
+            JS.InvokeVoidAsync("setTitle", $"{Queue.CurrentSong.Artist} - {Queue.CurrentSong.Title} — Castle");
+        }
+        else
+        {
+            JS.InvokeVoidAsync("setTitle", "Castle");
+        }
+    }
+
+    private string GetCoverUrl(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return "";
+        }
+
+        if (path.Contains("wwwroot"))
+        {
+            var fn = Path.GetFileName(path);
+            return $"covers/{fn}";
+        }
+
+        if (File.Exists(path))
+        {
+            return $"file:///{path.Replace("\\", "/")}";
+        }
+
+        return "";
+    }
+
+    private void UpdatePosition()
+    {
+        _currentPosition = Player.GetPosition();
+        _duration = Player.GetDuration();
+
+        var currentPath = Queue.CurrentSong?.FilePath;
+
+        if (currentPath != _lastFavoriteCheck)
+        {
+            _lastFavoriteCheck = currentPath;
+            _isFavorite = Player.IsCurrentSongFavorite();
+        }
+
+        StateHasChanged();
+    }
+
+    private void ToggleFavorite()
+    {
+        Player.ToggleFavorite();
+        _isFavorite = !_isFavorite;
+    }
+
+    private void OnSeek(ChangeEventArgs e)
+    {
+        var v = Convert.ToDouble(e.Value ?? 0);
+        Player.Seek(v);
+        _currentPosition = v;
+    }
+
+    private void OnVolumeChange(ChangeEventArgs e)
+    {
+        var vol = Convert.ToInt32(e.Value ?? 50) / 100f;
+        Player.SetVolume(vol);
+        Player.SaveVolume();
+    }
+
+    private void ToggleCompressor()
+    {
+        _compressorOn = !_compressorOn;
+        Player.EnableCompressor();
+    }
+
+    private string FormatTime(double s)
+    {
+        if (double.IsNaN(s) || double.IsInfinity(s) || s < 0)
+        {
+            return "0:00";
+        }
+
+        var t = TimeSpan.FromSeconds(s);
+        return t.Minutes.ToString() + ":" + t.Seconds.ToString("D2");
+    }
+
+    public void Dispose()
+    {
+        _timer?.Stop();
+        _timer?.Dispose();
+    }
+}

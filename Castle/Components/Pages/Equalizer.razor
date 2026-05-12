@@ -1,0 +1,68 @@
+﻿@page "/equalizer"
+@using Castle.Core.Services
+@inject PlaybackService Player
+
+<h3><LiSlidersHorizontal Size="20" Stroke="#BBBBBB" /> EQUALIZER</h3>
+
+@if (!_eqEnabled)
+{
+    <button @onclick="EnableEQ" class="top-bar-button">Enable Equalizer</button>
+}
+else
+{
+    <div class="eq-container">
+        @for (int i = 0; i < _bands.Length; i++)
+        {
+            var bandIndex = i;
+            <div class="eq-band">
+                <span class="eq-value">@((int)_bands[bandIndex]) dB</span>
+                <input type="range" min="-15" max="15" step="0.5" value="@_bands[bandIndex]"
+                       @oninput="(e) => OnBandChange(bandIndex, e)" class="eq-slider" />
+                <span class="eq-label">@_bandLabels[bandIndex]</span>
+            </div>
+        }
+    </div>
+
+    <div class="eq-presets">
+        <button @onclick="ApplyFlat" class="sort-btn">Flat</button>
+        <button @onclick="ApplyRock" class="sort-btn">Rock</button>
+        <button @onclick="ApplyPop" class="sort-btn">Pop</button>
+        <button @onclick="ApplyJazz" class="sort-btn">Jazz</button>
+        <button @onclick="ApplyClassical" class="sort-btn">Classical</button>
+        <button @onclick="ApplyBassBoost" class="sort-btn">Bass Boost</button>
+    </div>
+}
+
+@code {
+    private float[] _bands = new float[10];
+    private string[] _bandLabels = { "32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K" };
+    private bool _eqEnabled;
+
+    void EnableEQ()
+    {
+        _eqEnabled = true;
+        Player.EnableEQ();
+    }
+
+    void OnBandChange(int band, ChangeEventArgs e)
+    {
+        if (band < 0 || band >= _bands.Length) return;
+        var val = Convert.ToSingle(e.Value ?? 0);
+        _bands[band] = val;
+        Player.SetEqBand(band, val);
+    }
+
+    void ApplyFlat() => ApplyPreset(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    void ApplyRock() => ApplyPreset(4, 3, 1, 0, -1, -1, 0, 2, 3, 4);
+    void ApplyPop() => ApplyPreset(-1, 1, 3, 4, 3, 0, -1, -1, 0, 1);
+    void ApplyJazz() => ApplyPreset(3, 2, 1, 0, 1, 0, -1, -2, -2, -3);
+    void ApplyClassical() => ApplyPreset(3, 2, 1, 0, -1, -1, 0, 1, 2, 3);
+    void ApplyBassBoost() => ApplyPreset(8, 6, 3, 1, 0, 0, 0, 0, 0, 0);
+
+    void ApplyPreset(float b0, float b1, float b2, float b3, float b4, float b5, float b6, float b7, float b8, float b9)
+    {
+        _bands = new float[] { b0, b1, b2, b3, b4, b5, b6, b7, b8, b9 };
+        for (int i = 0; i < 10; i++)
+            Player.SetEqBand(i, _bands[i]);
+    }
+}

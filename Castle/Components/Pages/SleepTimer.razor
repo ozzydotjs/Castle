@@ -1,0 +1,46 @@
+﻿@page "/sleeptimer"
+@using Castle.Core.Services
+@inject PlaybackService Player
+@inject NavigationManager Navigation
+
+<h3><LiMoon Size="20" Stroke="#BBBBBB" /> SLEEP TIMER</h3>
+
+@if (Player.SleepTimerActive)
+{
+    <div class="sleep-active">
+        <p class="status-text">Music will stop in</p>
+        <h2>@FormatTimeRemaining()</h2>
+        <button @onclick="CancelTimer" class="top-bar-button">Cancel Timer</button>
+    </div>
+}
+else
+{
+    <p class="status-text">Select a duration. Music will automatically stop when the timer ends.</p>
+    <div class="sleep-options">
+        <button @onclick="() => SetTimer(15)" class="sleep-btn">15 min</button>
+        <button @onclick="() => SetTimer(30)" class="sleep-btn">30 min</button>
+        <button @onclick="() => SetTimer(45)" class="sleep-btn">45 min</button>
+        <button @onclick="() => SetTimer(60)" class="sleep-btn">1 hour</button>
+        <button @onclick="() => SetTimer(120)" class="sleep-btn">2 hours</button>
+    </div>
+}
+
+@code {
+    private void SetTimer(int minutes)
+    {
+        Player.SetSleepTimer(minutes);
+    }
+
+    private void CancelTimer()
+    {
+        Player.CancelSleepTimer();
+    }
+
+    private string FormatTimeRemaining()
+    {
+        var remaining = Player.SleepTimeRemaining;
+        if (remaining.TotalHours >= 1)
+            return $"{(int)remaining.TotalHours}h {remaining.Minutes}m";
+        return $"{remaining.Minutes}m {remaining.Seconds}s";
+    }
+}

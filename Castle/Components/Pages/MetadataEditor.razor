@@ -1,0 +1,126 @@
+﻿@page "/metadataeditor"
+@using Castle.Core.Interfaces
+@using Castle.Core.Models
+@using Castle.Core.Services
+@inject ISongRepository Repository
+@implements IDisposable
+
+<h3><LiEdit Size="20" Stroke="#BBBBBB" /> METADATA EDITOR</h3>
+
+@if (_selectedSong == null)
+{
+    <p class="status-text">Select a song from the list below to edit its metadata.</p>
+}
+
+<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+    @* Song List *@
+    <div style="flex: 1; min-width: 300px;">
+        <h3>Library (@_songs.Count SONGS)</h3>
+        <ul class="song-list">
+            @foreach (var song in _songs)
+            {
+                <li @onclick="() => SelectSong(song)" 
+                    class="@(_selectedSong?.Id == song.Id ? "active" : "") 
+                           @(_multiSelect.Contains(song.Id) ? "multi-selected" : "")">
+                    <input type="checkbox" 
+                           checked="@_multiSelect.Contains(song.Id)"
+                           @onchange="(e) => ToggleMultiSelect(song.Id, (bool)e.Value!)"
+                           @onclick:stopPropagation="true" />
+                    <span class="song-info">
+                        <span class="song-title">@song.Title</span>
+                        <span class="song-artist">@song.Artist</span>
+                    </span>
+                </li>
+            }
+        </ul>
+    </div>
+
+    @* Editor Panel *@
+    <div style="flex: 1; min-width: 300px;">
+        @if (_selectedSong != null)
+        {
+            <h3>Edit Song</h3>
+            <div class="metadata-form">
+                <label>Title</label>
+                <input @bind="_editTitle" class="metadata-input" />
+                
+                <label>Artist</label>
+                <input @bind="_editArtist" class="metadata-input" />
+                
+                <label>Album</label>
+                <input @bind="_editAlbum" class="metadata-input" />
+                
+                <label>Genre</label>
+                <input @bind="_editGenre" class="metadata-input" />
+
+                <button @onclick="SaveMetadata" class="top-bar-button">💾 Save</button>
+            </div>
+        }
+
+        @if (_multiSelect.Count > 0)
+        {
+            <div style="margin-top: 20px;">
+                <h3>Batch Actions (@_multiSelect.Count selected)</h3>
+                <button @onclick="AddSelectedToPlaylist" class="sort-btn">➕ Add to Playlist</button>
+                <button @onclick="ClearSelection" class="sort-btn">✗ Clear Selection</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Song> _songs = new();
+    private Song? _selectedSong;
+    private HashSet<string> _multiSelect = new();
+    private string _editTitle = "", _editArtist = "", _editAlbum = "", _editGenre = "";
+
+    protected override void OnInitialized()
+    {
+        LoadSongs();
+    }
+
+    void LoadSongs()
+    {
+        _songs = Repository.GetAll();
+    }
+
+    void SelectSong(Song song)
+    {
+        _selectedSong = song;
+        _editTitle = song.Title;
+        _editArtist = song.Artist;
+        _editAlbum = song.Album;
+        _editGenre = song.Genre;
+    }
+
+    void ToggleMultiSelect(string songId, bool selected)
+    {
+        if (selected) _multiSelect.Add(songId);
+        else _multiSelect.Remove(songId);
+    }
+
+    void SaveMetadata()
+    {
+        if (_selectedSong == null) return;
+        _selectedSong.Title = _editTitle;
+        _selectedSong.Artist = _editArtist;
+        _selectedSong.Album = _editAlbum;
+        _selectedSong.Genre = _editGenre;
+        Repository.Update(_selectedSong);
+        LoadSongs();
+        _selectedSong = null;
+    }
+
+    void AddSelectedToPlaylist()
+    {
+        // Navigate to playlist selection — can extend later
+    }
+
+    void ClearSelection()
+    {
+        _multiSelect.Clear();
+        _selectedSong = null;
+    }
+
+    public void Dispose() { }
+}

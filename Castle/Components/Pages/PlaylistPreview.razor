@@ -1,0 +1,104 @@
+﻿@page "/playlist-preview"
+@using Castle.Core.Services
+@using Castle.Core.Models
+@inject SearchService SearchService
+@inject DownloadQueueService DownloadQueue
+@inject NavigationManager Navigation
+
+<div class="np-back-btn" style="position: static; margin-bottom: 16px;">
+    <button @onclick="GoBack" class="ctrl-btn" title="Back">
+        <LiArrowLeft Size="20" Stroke="#BBBBBB" /> Back
+    </button>
+</div>
+
+@if (_isLoading)
+{
+    <p class="status-text">Loading playlist...</p>
+}
+else if (_tracks.Count == 0)
+{
+    <div class="empty-state">
+        <LiMusic Size="48" Stroke="#555" />
+        <h3>No tracks found</h3>
+        <p class="status-text">Try a different playlist.</p>
+    </div>
+}
+else
+{
+    <h3>@_playlistName (@_tracks.Count tracks)</h3>
+    
+    <button @onclick="DownloadAll" class="top-bar-button" style="margin-bottom: 16px;">
+        <LiDownload Size="16" Stroke="#FFFFFF" /> Download All
+    </button>
+
+    <ul class="song-list">
+        @foreach (var track in _tracks)
+        {
+            <li>
+                @if (!string.IsNullOrEmpty(track.ThumbnailUrl))
+                {
+                    <img src="@track.ThumbnailUrl" class="song-cover" />
+                }
+                else
+                {
+                    <span class="song-cover-placeholder">🎵</span>
+                }
+                <span class="song-info">
+                    <span class="song-title">@track.Title</span>
+                    <span class="song-artist">@track.Author</span>
+                </span>
+                <button @onclick="() => DownloadTrack(track)" class="download-btn" title="Download">
+                    <LiDownload Size="14" Stroke="#4caf50" />
+                </button>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Query { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Name { get; set; }
+
+    private string _playlistName = "";
+    private List<SearchResult> _tracks = new();
+    private bool _isLoading = true;
+
+    protected override async void OnInitialized()
+    {
+        _playlistName = Name ?? "Playlist";
+        
+        if (!string.IsNullOrEmpty(Query))
+        {
+            _tracks = await SearchService.SearchAsync(Query, 20);
+        }
+        
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    void DownloadTrack(SearchResult track)
+    {
+        DownloadQueue.AddToQueue(
+            $"https://youtube.com/watch?v={track.VideoId}",
+            track.Title,
+            track.Author);
+    }
+
+    void DownloadAll()
+    {
+        foreach (var track in _tracks)
+        {
+            DownloadQueue.AddToQueue(
+                $"https://youtube.com/watch?v={track.VideoId}",
+                track.Title,
+                track.Author);
+        }
+    }
+
+    void GoBack() => Navigation.NavigateTo("/");
+}

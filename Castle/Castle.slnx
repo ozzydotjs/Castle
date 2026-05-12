@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="../Castle.core/Castle.core.csproj" />
+  <Project Path="../Castle.data/Castle.data.csproj" />
+  <Project Path="Castle.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+</Solution>

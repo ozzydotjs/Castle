@@ -1,0 +1,87 @@
+﻿@page "/updates"
+@using Castle.Services
+@inject UpdateService UpdateChecker
+@inject IJSRuntime JS
+
+<div class="updates-page">
+    <h2>Castle Updates</h2>
+    <p class="status-text">Check if a newer version of Castle is available.</p>
+
+    <div class="updates-card">
+        <div class="updates-row">
+            <span>Current Version</span>
+            <strong>@AppVersion.Current</strong>
+        </div>
+
+        @if (_checking)
+        {
+            <p class="status-text">Checking for updates...</p>
+        }
+        else if (_updateInfo == null && _checked)
+        {
+            <p class="status-text">Could not check for updates. Try again later.</p>
+        }
+        else if (_updateInfo != null)
+        {
+            <div class="updates-row">
+                <span>Latest Version</span>
+                <strong>@_updateInfo.LatestVersion</strong>
+            </div>
+
+            @if (_updateInfo.IsUpdateAvailable)
+            {
+                <div class="updates-available">
+                    <strong>New update available.</strong>
+                    <p>Download the latest Castle installer from GitHub Releases.</p>
+
+                    <button class="updates-btn" @onclick="OpenRelease">
+                        Download Update
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="updates-current">
+                    <strong>Castle is up to date.</strong>
+                    <p>You are already using the latest version.</p>
+                </div>
+            }
+        }
+
+        <button class="updates-btn secondary" @onclick="CheckUpdates" disabled="@_checking">
+            @(_checking ? "Checking..." : "Check for Updates")
+        </button>
+    </div>
+</div>
+
+@code {
+    private bool _checking;
+    private bool _checked;
+    private UpdateInfo? _updateInfo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUpdates();
+    }
+
+    private async Task CheckUpdates()
+    {
+        _checking = true;
+        _checked = false;
+
+        _updateInfo = await UpdateChecker.CheckForUpdatesAsync();
+
+        _checking = false;
+        _checked = true;
+    }
+
+    private async Task OpenRelease()
+    {
+        if (_updateInfo == null || string.IsNullOrWhiteSpace(_updateInfo.ReleaseUrl))
+        {
+            return;
+        }
+
+        await Launcher.OpenAsync(_updateInfo.ReleaseUrl);
+    }
+}

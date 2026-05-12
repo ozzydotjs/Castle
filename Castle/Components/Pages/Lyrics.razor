@@ -1,0 +1,153 @@
+@page "/lyrics"
+@using Castle.Core.Models
+@using Castle.Core.Services
+@using System.Timers
+@implements IDisposable
+@inject PlaybackService Player
+@inject QueueService Queue
+
+<h3><LiMusic Size="20" Stroke="#BBBBBB" /> LYRICS</h3>
+
+@if (Queue.CurrentSong == null)
+{
+    <div class="empty-state">
+        <LiMusic Size="48" Stroke="#555" />
+        <h3>No song playing</h3>
+        <p class="status-text">Play a song to see its lyrics here.</p>
+    </div>
+}
+else
+{
+    <div class="lyrics-now-playing">
+        <strong>@Queue.CurrentSong.Title</strong>
+        <span class="player-artist"> — @Queue.CurrentSong.Artist</span>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p class="status-text">Loading lyrics...</p>
+    }
+    else if (_lyrics.Count == 0)
+    {
+        <div class="empty-state">
+            <LiFileText Size="48" Stroke="#555" />
+            <h3>No lyrics found</h3>
+            <p class="status-text">Lyrics aren't available for this song.</p>
+        </div>
+    }
+    else if (_hasTimestamps)
+    {
+        <div class="lyrics-container">
+            @foreach (var line in _lyrics)
+            {
+                var isActive = _currentPosition >= line.Timestamp.TotalSeconds &&
+                               _currentPosition < line.Timestamp.TotalSeconds + 5;
+                <p class="lyric-line @(isActive ? "active" : "")" 
+                   style="font-size: @(isActive ? "22px" : "14px"); 
+                          opacity: @(isActive ? "1" : "0.4");">
+                    @line.Text
+                </p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="lyrics-container">
+            @foreach (var line in _lyrics)
+            {
+                <p class="lyric-line plain">@line.Text</p>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<LyricLine> _lyrics = new();
+    private double _currentPosition;
+    private bool _isLoading;
+    private bool _hasTimestamps;
+    private System.Timers.Timer? _timer;
+    private string _lastSongId = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        Player.LyricsLoaded += OnLyricsLoaded;
+        Queue.QueueChanged += () => InvokeAsync(LoadLyrics);
+        Player.StateChanged += () => InvokeAsync(StateHasChanged);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _timer = new System.Timers.Timer(100);
+            _timer.Elapsed += async (_, _) =>
+            {
+                _currentPosition = Player.GetPosition();
+                await InvokeAsync(StateHasChanged);
+            };
+            _timer.AutoReset = true;
+            _timer.Start();
+
+            if (Queue.CurrentSong != null)
+            {
+                if (Player.CurrentLyrics != null && Player.CurrentLyrics.Count > 0)
+                {
+                    _lyrics = Player.CurrentLyrics;
+                    _hasTimestamps = Player.CurrentLyrics.Any(l => l.Timestamp > TimeSpan.Zero);
+                    _lastSongId = Queue.CurrentSong.Id;
+                    _isLoading = false;
+                    StateHasChanged();
+                }
+                else
+                {
+                    LoadLyrics();
+                }
+            }
+        }
+    }
+
+    void OnLyricsLoaded()
+    {
+        InvokeAsync(() =>
+        {
+            if (Queue.CurrentSong != null && Player.CurrentLyrics != null)
+            {
+                _lyrics = Player.CurrentLyrics;
+                _hasTimestamps = Player.CurrentLyrics.Any(l => l.Timestamp > TimeSpan.Zero);
+                _lastSongId = Queue.CurrentSong.Id;
+                _isLoading = false;
+                StateHasChanged();
+            }
+        });
+    }
+
+    async Task LoadLyrics()
+    {
+        if (Queue.CurrentSong == null) return;
+        if (Queue.CurrentSong.Id == _lastSongId && _lyrics.Count > 0) return;
+
+        _lastSongId = Queue.CurrentSong.Id;
+        _lyrics.Clear();
+        _hasTimestamps = false;
+
+        if (Player.CurrentLyrics != null && Player.CurrentLyrics.Count > 0)
+        {
+            _lyrics = Player.CurrentLyrics;
+            _hasTimestamps = Player.CurrentLyrics.Any(l => l.Timestamp > TimeSpan.Zero);
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Player.LyricsLoaded -= OnLyricsLoaded;
+        _timer?.Stop();
+        _timer?.Dispose();
+    }
+}

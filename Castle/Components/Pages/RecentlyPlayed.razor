@@ -1,0 +1,113 @@
+﻿@page "/recentlyplayed"
+@using Castle.Core.Interfaces
+@using Castle.Core.Models
+@using Castle.Core.Services
+@inject IRecentlyPlayedRepository RecentlyPlayedRepo
+@inject PlaybackService Player
+@inject QueueService Queue
+
+<h3><LiClock Size="20" Stroke="#BBBBBB" /> RECENTLY PLAYED</h3>
+
+@if (_entries.Count == 0)
+{
+    <div class="empty-state">
+        <LiMusic Size="48" Stroke="#555" />
+        <h3>No listening history</h3>
+        <p class="status-text">Songs you play will appear here.</p>
+    </div>
+}
+else
+{
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3>@_entries.Count SONGS</h3>
+        <button @onclick="ClearHistory" class="refresh-btn" title="Clear history">
+            <LiTrash2 Size="14" Stroke="#ff4444" /> Clear
+        </button>
+    </div>
+
+    <ul class="song-list">
+        @foreach (var entry in _entries)
+        {
+            <li @onclick="() => PlayEntry(entry)" 
+                class="@(Queue.CurrentSong?.FilePath == entry.FilePath ? "active" : "")">
+                @if (!string.IsNullOrEmpty(entry.CoverArtPath))
+                {
+                    <img src="@GetCoverUrl(entry.CoverArtPath)" class="song-cover" />
+                }
+                else
+                {
+                    <span class="song-cover-placeholder">🎵</span>
+                }
+                <span class="song-info">
+                    <span class="song-title">@entry.Title</span>
+                    <span class="song-artist">@entry.Artist</span>
+                </span>
+                <span class="song-duration">@FormatDuration(entry.Duration)</span>
+                <span class="recently-played-time">@FormatPlayedTime(entry.PlayedAt)</span>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<RecentlyPlayedEntry> _entries = new();
+
+    protected override void OnInitialized()
+    {
+        LoadHistory();
+        Queue.QueueChanged += () => InvokeAsync(LoadHistory);
+    }
+
+    void LoadHistory()
+    {
+        _entries = RecentlyPlayedRepo.GetAll(50);
+    }
+
+    void PlayEntry(RecentlyPlayedEntry entry)
+    {
+        var song = new Song
+        {
+            FilePath = entry.FilePath,
+            Title = entry.Title,
+            Artist = entry.Artist,
+            Duration = entry.Duration,
+            CoverArtPath = entry.CoverArtPath
+        };
+        Player.PlaySong(song);
+    }
+
+    void ClearHistory()
+    {
+        RecentlyPlayedRepo.Clear();
+        LoadHistory();
+    }
+
+    string GetCoverUrl(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return "";
+        if (path.Contains("wwwroot"))
+        {
+            var fileName = Path.GetFileName(path);
+            return $"covers/{fileName}";
+        }
+        if (File.Exists(path))
+            return $"file:///{path.Replace("\\", "/")}";
+        return "";
+    }
+
+    string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+            return string.Format("{0}:{1:D2}:{2:D2}", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
+        return string.Format("{0}:{1:D2}", duration.Minutes, duration.Seconds);
+    }
+
+    string FormatPlayedTime(DateTime playedAt)
+    {
+        var diff = DateTime.Now - playedAt;
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        return playedAt.ToString("MMM dd");
+    }
+}
