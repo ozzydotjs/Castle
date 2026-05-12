@@ -367,12 +367,9 @@ else if (!_isScanning && !_isLoading)
     string GetActiveClass(Song song) => song.FilePath == _currentFilePath ? "active" : "";
 
     string GetCoverUrl(string? path)
-    {
-        if (string.IsNullOrEmpty(path)) return "";
-        if (path.Contains("wwwroot")) { var fn = Path.GetFileName(path); return $"covers/{fn}"; }
-        if (File.Exists(path)) return $"file:///{path.Replace("\\", "/")}";
-        return "";
-    }
+{
+    return CoverArtService.GetCoverUrl(path);
+}
 
     void PlaySong(Song song) { Player.PlaySong(song); _currentFilePath = song.FilePath; ScrollToActiveSong(); }
     async void ScrollToActiveSong() { try { await JS.InvokeVoidAsync("scrollToActive", "song-list"); } catch { } }

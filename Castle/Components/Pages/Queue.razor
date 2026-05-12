@@ -85,18 +85,10 @@ else
         LoadQueue();
     }
 
-    string GetCoverUrl(string? path)
-    {
-        if (string.IsNullOrEmpty(path)) return "";
-        if (path.Contains("wwwroot"))
-        {
-            var fileName = Path.GetFileName(path);
-            return $"covers/{fileName}";
-        }
-        if (File.Exists(path))
-            return $"file:///{path.Replace("\\", "/")}";
-        return "";
-    }
+    private string GetCoverUrl(string? path)
+{
+    return CoverArtService.GetCoverUrl(path);
+}
 
     string FormatDuration(TimeSpan duration)
     {

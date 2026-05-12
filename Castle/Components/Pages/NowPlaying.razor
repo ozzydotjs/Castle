@@ -413,25 +413,9 @@
     }
 
     private string GetCoverUrl(string? path)
-    {
-        if (string.IsNullOrEmpty(path))
-        {
-            return "";
-        }
-
-        if (path.Contains("wwwroot"))
-        {
-            var fn = Path.GetFileName(path);
-            return $"covers/{fn}";
-        }
-
-        if (File.Exists(path))
-        {
-            return $"file:///{path.Replace("\\", "/")}";
-        }
-
-        return "";
-    }
+{
+    return CoverArtService.GetCoverUrl(path);
+}
 
     private string FormatTime(double s)
     {
