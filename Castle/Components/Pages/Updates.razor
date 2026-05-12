@@ -1,7 +1,6 @@
 ﻿@page "/updates"
 @using Castle.Services
 @inject UpdateService UpdateChecker
-@inject IJSRuntime JS
 
 <div class="updates-page">
     <h2>Castle Updates</h2>
@@ -19,7 +18,13 @@
         }
         else if (_updateInfo == null && _checked)
         {
-            <p class="status-text">Could not check for updates. Try again later.</p>
+            <div class="updates-current">
+                <strong>Could not check for updates.</strong>
+                <p>
+                    Make sure the GitHub repository has a public release.
+                    Private repositories will not work without authentication.
+                </p>
+            </div>
         }
         else if (_updateInfo != null)
         {
@@ -28,13 +33,21 @@
                 <strong>@_updateInfo.LatestVersion</strong>
             </div>
 
+            @if (!string.IsNullOrWhiteSpace(_updateInfo.ReleaseName))
+            {
+                <div class="updates-row">
+                    <span>Release</span>
+                    <strong>@_updateInfo.ReleaseName</strong>
+                </div>
+            }
+
             @if (_updateInfo.IsUpdateAvailable)
             {
                 <div class="updates-available">
                     <strong>New update available.</strong>
                     <p>Download the latest Castle installer from GitHub Releases.</p>
 
-                    <button class="updates-btn" @onclick="OpenRelease">
+                    <button class="updates-btn" @onclick="OpenUpdate">
                         Download Update
                     </button>
                 </div>
@@ -75,13 +88,22 @@
         _checked = true;
     }
 
-    private async Task OpenRelease()
+    private async Task OpenUpdate()
     {
-        if (_updateInfo == null || string.IsNullOrWhiteSpace(_updateInfo.ReleaseUrl))
+        if (_updateInfo == null)
         {
             return;
         }
 
-        await Launcher.OpenAsync(_updateInfo.ReleaseUrl);
+        var url = !string.IsNullOrWhiteSpace(_updateInfo.InstallerDownloadUrl)
+            ? _updateInfo.InstallerDownloadUrl
+            : _updateInfo.ReleaseUrl;
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        await Launcher.OpenAsync(url);
     }
 }
