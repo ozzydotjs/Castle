@@ -46,6 +46,19 @@ public class AudioEngine : IAudioEngine, IDisposable
         if (!_initialized)
             Initialize();
 
+        // If this is the same file already loaded, just resume
+        if (_currentHandle != 0)
+        {
+            var currentState = Bass.ChannelIsActive(_currentHandle);
+            if (currentState == PlaybackState.Paused)
+            {
+                Bass.ChannelPlay(_currentHandle);
+                return;
+            }
+            if (currentState == PlaybackState.Playing)
+                return;
+        }
+
         float currentVol = Volume;
         bool wasEqEnabled = _eqEnabled;
         float[] savedBands = new float[10];
@@ -61,7 +74,6 @@ public class AudioEngine : IAudioEngine, IDisposable
             Bass.ChannelSetSync(_currentHandle, SyncFlags.End, 0, _endSync);
             Volume = currentVol;
 
-            // Re-apply EQ if it was enabled before
             if (wasEqEnabled)
             {
                 EnableEqualizerInternal();
@@ -122,18 +134,29 @@ public class AudioEngine : IAudioEngine, IDisposable
             Bass.StreamFree(_currentHandle);
             _currentHandle = 0;
             _eqHandle = 0;
+            _eqEnabled = false;
             _compressorEnabled = false;
         }
     }
 
     public void Pause()
     {
-        if (_currentHandle != 0)
-        {
-            bool playing = Bass.ChannelIsActive(_currentHandle) == PlaybackState.Playing;
-            if (playing) Bass.ChannelPause(_currentHandle);
-            else Bass.ChannelPlay(_currentHandle);
-        }
+        if (_currentHandle == 0) return;
+
+        var state = Bass.ChannelIsActive(_currentHandle);
+        if (state == PlaybackState.Playing)
+            Bass.ChannelPause(_currentHandle);
+        else if (state == PlaybackState.Paused)
+            Bass.ChannelPlay(_currentHandle);
+    }
+
+    public void Resume()
+    {
+        if (_currentHandle == 0) return;
+
+        var state = Bass.ChannelIsActive(_currentHandle);
+        if (state == PlaybackState.Paused)
+            Bass.ChannelPlay(_currentHandle);
     }
 
     public bool IsPlaying => _currentHandle != 0 && Bass.ChannelIsActive(_currentHandle) == PlaybackState.Playing;
