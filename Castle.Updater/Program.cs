@@ -1,73 +1,103 @@
 ﻿using System.Diagnostics;
 
+var logPath = Path.Combine(Path.GetTempPath(), "Castle.Updater.log");
+File.WriteAllText(logPath, $"Updater started at {DateTime.Now}\nArgs: {string.Join(", ", args)}\n");
+
 if (args.Length == 0)
 {
+    File.AppendAllText(logPath, "No args, exiting.\n");
     return;
 }
 
 var installerPath = args[0];
+var isStage2 = args.Contains("--stage2");
+File.AppendAllText(logPath, $"Installer path: {installerPath}\nStage2: {isStage2}\n");
 
-// Copy ourselves to temp so we survive the install overwriting us
-var tempUpdater = Path.Combine(Path.GetTempPath(), "Castle.Updater.exe");
+if (!isStage2)
+{
+    var tempUpdater = Path.Combine(Path.GetTempPath(), "Castle.Updater.exe");
+    File.AppendAllText(logPath, $"Stage 1: Copying to {tempUpdater}\n");
+    try
+    {
+        File.Copy(Environment.ProcessPath!, tempUpdater, true);
+        File.AppendAllText(logPath, "Copy succeeded, launching stage 2.\n");
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = tempUpdater,
+            Arguments = $"\"{installerPath}\" --stage2",
+            UseShellExecute = false,
+            WindowStyle = ProcessWindowStyle.Hidden
+        });
+        File.AppendAllText(logPath, "Stage 2 launched, exiting stage 1.\n");
+        return;
+    }
+    catch (Exception ex)
+    {
+        File.AppendAllText(logPath, $"Copy failed: {ex.Message}, falling through to inline.\n");
+    }
+}
+
+// Stage 2
+File.AppendAllText(logPath, "Stage 2: Waiting 2 seconds...\n");
+await Task.Delay(2000);
+
 try
 {
-    File.Copy(Environment.ProcessPath!, tempUpdater, true);
-
-    // Launch the temp copy with the same args and exit this instance
-    Process.Start(new ProcessStartInfo
+    File.AppendAllText(logPath, "Killing Castle processes...\n");
+    var castleProcesses = Process.GetProcessesByName("Castle");
+    File.AppendAllText(logPath, $"Found {castleProcesses.Length} Castle process(es).\n");
+    foreach (var p in castleProcesses)
     {
-        FileName = tempUpdater,
-        Arguments = $"\"{installerPath}\" --stage2",
-        UseShellExecute = false,
+        try { p.Kill(); p.WaitForExit(3000); File.AppendAllText(logPath, $"Killed Castle PID {p.Id}.\n"); }
+        catch (Exception ex) { File.AppendAllText(logPath, $"Failed to kill Castle: {ex.Message}\n"); }
+    }
+
+    File.AppendAllText(logPath, $"Running installer: {installerPath} /VERYSILENT\n");
+    if (!File.Exists(installerPath))
+    {
+        File.AppendAllText(logPath, "INSTALLER FILE NOT FOUND!\n");
+        return;
+    }
+
+    var startInfo = new ProcessStartInfo
+    {
+        FileName = installerPath,
+        Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
+        UseShellExecute = true,
         WindowStyle = ProcessWindowStyle.Hidden
-    });
-    return;
-}
-catch
-{
-    // If copy fails, just continue inline
-}
+    };
 
-// Stage 2: actual update logic
-if (args.Contains("--stage2") || true)
-{
-    // Wait for Castle to fully close
-    await Task.Delay(2000);
-
-    try
+    using var installer = Process.Start(startInfo);
+    if (installer != null)
     {
-        // Kill any lingering Castle processes
-        var castleProcesses = Process.GetProcessesByName("Castle");
-        foreach (var p in castleProcesses)
-        {
-            try { p.Kill(); p.WaitForExit(3000); } catch { }
-        }
-
-        // Run installer silently
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = installerPath,
-            Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
-            UseShellExecute = true,
-            WindowStyle = ProcessWindowStyle.Hidden
-        };
-
-        using var installer = Process.Start(startInfo);
-        if (installer != null)
-        {
-            await installer.WaitForExitAsync();
-        }
-
-        // Clean up downloaded installer
-        try { File.Delete(installerPath); } catch { }
+        File.AppendAllText(logPath, "Waiting for installer to finish...\n");
+        await installer.WaitForExitAsync();
+        File.AppendAllText(logPath, $"Installer exited with code {installer.ExitCode}.\n");
     }
-    catch { }
-
-    // Clean up temp copy
-    try
+    else
     {
-        await Task.Delay(1000);
+        File.AppendAllText(logPath, "Failed to start installer process.\n");
+    }
+
+    try { File.Delete(installerPath); File.AppendAllText(logPath, "Deleted downloaded installer.\n"); }
+    catch { }
+}
+catch (Exception ex)
+{
+    File.AppendAllText(logPath, $"Stage 2 error: {ex.Message}\n{ex.StackTrace}\n");
+}
+
+try
+{
+    await Task.Delay(1000);
+    var tempUpdater = Path.Combine(Path.GetTempPath(), "Castle.Updater.exe");
+    if (File.Exists(tempUpdater))
+    {
         File.Delete(tempUpdater);
+        File.AppendAllText(logPath, "Deleted temp updater.\n");
     }
-    catch { }
 }
+catch { }
+
+File.AppendAllText(logPath, "Updater finished.\n");

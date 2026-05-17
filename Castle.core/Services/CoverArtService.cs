@@ -12,9 +12,12 @@ public static class CoverArtService
         "covers"
     );
 
-    private static readonly long MaxCoversFolderSize = 500 * 1024 * 1024; // 500MB max
-    private static readonly int MaxCoverFiles = 5000; // Max 5000 cover files
+    private static readonly long MaxCoversFolderSize = 500 * 1024 * 1024;
+    private static readonly int MaxCoverFiles = 5000;
     private static bool _cleanupRun = false;
+
+    private static readonly Dictionary<string, string> _coverUrlCache = new();
+    private static readonly int MaxCacheEntries = 200;
 
     static CoverArtService()
     {
@@ -62,13 +65,10 @@ public static class CoverArtService
     public static string GetCoverUrl(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
-        {
             return string.Empty;
-        }
 
         try
         {
-            // Already a remote URL or data URI - pass through
             if (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
@@ -76,14 +76,38 @@ public static class CoverArtService
                 return path;
             }
 
-            // Serve as file URL instead of base64 to avoid massive memory bloat
-            if (File.Exists(path))
+            // Check cache
+            if (_coverUrlCache.TryGetValue(path, out var cached))
+                return cached;
+
+            if (!File.Exists(path))
+                return string.Empty;
+
+            // Evict oldest if cache is full
+            if (_coverUrlCache.Count >= MaxCacheEntries)
             {
-                var fileName = Path.GetFileName(path);
-                return $"covers/{fileName}";
+                var firstKey = _coverUrlCache.Keys.First();
+                _coverUrlCache.Remove(firstKey);
             }
 
-            return string.Empty;
+            var extension = Path.GetExtension(path).ToLowerInvariant();
+            var mimeType = extension switch
+            {
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                ".gif" => "image/gif",
+                ".bmp" => "image/bmp",
+                ".jpeg" => "image/jpeg",
+                ".jpg" => "image/jpeg",
+                _ => "image/jpeg"
+            };
+
+            var bytes = File.ReadAllBytes(path);
+            var base64 = Convert.ToBase64String(bytes);
+            var url = $"data:{mimeType};base64,{base64}";
+
+            _coverUrlCache[path] = url;
+            return url;
         }
         catch
         {
@@ -122,18 +146,15 @@ public static class CoverArtService
                 case 1:
                     DrawTile(graphics, validPaths[0], 0, 0, outputSize, outputSize);
                     break;
-
                 case 2:
                     DrawTile(graphics, validPaths[0], 0, 0, outputSize / 2, outputSize);
                     DrawTile(graphics, validPaths[1], outputSize / 2, 0, outputSize / 2, outputSize);
                     break;
-
                 case 3:
                     DrawTile(graphics, validPaths[0], 0, 0, outputSize / 2, outputSize / 2);
                     DrawTile(graphics, validPaths[1], outputSize / 2, 0, outputSize / 2, outputSize / 2);
                     DrawTile(graphics, validPaths[2], outputSize / 4, outputSize / 2, outputSize / 2, outputSize / 2);
                     break;
-
                 case 4:
                     DrawTile(graphics, validPaths[0], 0, 0, tileSize, tileSize);
                     DrawTile(graphics, validPaths[1], tileSize, 0, tileSize, tileSize);

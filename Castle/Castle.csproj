@@ -27,9 +27,9 @@
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
-		<Version>$(ApplicationDisplayVersion).$(ApplicationVersion)</Version>
-		<InformationalVersion>$(Version)</InformationalVersion>
+		<ApplicationVersion>0</ApplicationVersion>
+		<Version>$(ApplicationDisplayVersion)</Version>
+		<InformationalVersion>$(ApplicationDisplayVersion)</InformationalVersion>
 
 		<WindowsPackageType>None</WindowsPackageType>
 

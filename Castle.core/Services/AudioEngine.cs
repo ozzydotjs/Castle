@@ -46,7 +46,7 @@ public class AudioEngine : IAudioEngine, IDisposable
         if (!_initialized)
             Initialize();
 
-        // If this is the same file already loaded, just resume
+        // If paused, just resume
         if (_currentHandle != 0)
         {
             var currentState = Bass.ChannelIsActive(_currentHandle);
@@ -55,10 +55,9 @@ public class AudioEngine : IAudioEngine, IDisposable
                 Bass.ChannelPlay(_currentHandle);
                 return;
             }
-            if (currentState == PlaybackState.Playing)
-                return;
         }
 
+        // Load the new file
         float currentVol = Volume;
         bool wasEqEnabled = _eqEnabled;
         float[] savedBands = new float[10];
@@ -216,7 +215,7 @@ public class AudioEngine : IAudioEngine, IDisposable
 
             var fftSize = 512;
             var data = new float[fftSize];
-            var flags = unchecked((int)(0x40000000 | 0x80000004)); // BASS_DATA_FLOAT | BASS_DATA_FFT1024
+            var flags = unchecked((int)(0x40000000 | 0x80000004));
             var result = Bass.ChannelGetData(_currentHandle, data, flags);
             if (result <= 0) return output;
 
