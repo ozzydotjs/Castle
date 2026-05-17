@@ -104,6 +104,10 @@
 		<None Update="yt-dlp.exe" Condition="Exists('yt-dlp.exe')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<None Include="..\publish\windows\Castle.Updater.exe"
+      Condition="Exists('..\publish\windows\Castle.Updater.exe')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 	<ItemGroup>

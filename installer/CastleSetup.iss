@@ -1,5 +1,5 @@
 #define MyAppName "Castle"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "ozzydotjs"
 #define MyAppURL "https://github.com/ozzydotjs/Castle"
 #define MyAppExeName "Castle.exe"
@@ -19,10 +19,10 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 
 OutputDir=Output
-OutputBaseFilename=CastleSetup
+OutputBaseFilename=CastleSetup-{#MyAppVersion}
 
-SetupIconFile=..\Castle\wwwroot\{#MyAppIconName}
-UninstallDisplayIcon={app}\{#MyAppIconName}
+SetupIconFile=..\Castle\wwwroot\skull-logo.ico
+UninstallDisplayIcon={app}\skull-logo.ico
 
 Compression=lzma
 SolidCompression=yes
@@ -57,11 +57,12 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [Files]
 Source: "..\publish\windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\Castle\wwwroot\{#MyAppIconName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\windows\Castle.Updater.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\Castle\wwwroot\skull-logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppIconName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppIconName}"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\skull-logo.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\skull-logo.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Castle"; Flags: nowait postinstall skipifsilent

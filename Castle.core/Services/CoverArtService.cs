@@ -12,6 +12,55 @@ public static class CoverArtService
         "covers"
     );
 
+    private static readonly long MaxCoversFolderSize = 500 * 1024 * 1024; // 500MB max
+    private static readonly int MaxCoverFiles = 5000; // Max 5000 cover files
+    private static bool _cleanupRun = false;
+
+    static CoverArtService()
+    {
+        Directory.CreateDirectory(CoversFolder);
+        CleanupCoversFolder();
+    }
+
+    public static void CleanupCoversFolder()
+    {
+        if (_cleanupRun) return;
+        _cleanupRun = true;
+
+        try
+        {
+            if (!Directory.Exists(CoversFolder)) return;
+
+            var files = Directory.GetFiles(CoversFolder)
+                .Select(f => new FileInfo(f))
+                .OrderByDescending(f => f.LastWriteTime)
+                .ToList();
+
+            // Delete oldest files if we exceed count limit
+            if (files.Count > MaxCoverFiles)
+            {
+                foreach (var file in files.Skip(MaxCoverFiles))
+                {
+                    try { file.Delete(); } catch { }
+                }
+            }
+
+            // Delete oldest files if we exceed size limit
+            long totalSize = files.Where(f => f.Exists).Sum(f => { try { return f.Length; } catch { return 0; } });
+            var remaining = files.Where(f => f.Exists).ToList();
+
+            while (totalSize > MaxCoversFolderSize && remaining.Count > 0)
+            {
+                var oldest = remaining.Last();
+                var size = oldest.Length;
+                totalSize -= size;
+                try { oldest.Delete(); } catch { }
+                remaining.RemoveAt(remaining.Count - 1);
+            }
+        }
+        catch { }
+    }
+
     public static string GetCoverUrl(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))

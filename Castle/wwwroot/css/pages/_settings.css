@@ -379,3 +379,20 @@
         transform: translateX(22px);
         background: #fff;
     }
+/* ========== UPDATE PROGRESS ========== */
+
+.updates-progress {
+    width: 100%;
+    height: 6px;
+    background: var(--surface-hover);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0.75rem 0;
+}
+
+.updates-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.2s ease;
+}

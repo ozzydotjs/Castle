@@ -45,11 +45,44 @@
             {
                 <div class="updates-available">
                     <strong>New update available.</strong>
-                    <p>Download the latest Castle installer from GitHub Releases.</p>
 
-                    <button class="updates-btn" @onclick="OpenUpdate">
-                        Download Update
-                    </button>
+                    @if (_downloadState == null)
+                    {
+                        <p>Download and install the latest version automatically.</p>
+                        <button class="updates-btn" @onclick="DownloadAndInstall" disabled="@_downloading">
+                            @(_downloading ? "Preparing..." : "Download and Install")
+                        </button>
+                    }
+                    else if (_downloadState == "Ready to install" && !string.IsNullOrEmpty(_installerPath))
+                    {
+                        <p>Download complete. Castle will restart to apply the update.</p>
+                        <div class="updates-progress">
+                            <div class="updates-progress-bar" style="width: 100%"></div>
+                        </div>
+                        <button class="updates-btn" @onclick="InstallUpdate">
+                            Install and Restart
+                        </button>
+                    }
+                    else if (_downloadState == "Download failed" || _downloadState == "Cancelled")
+                    {
+                        <p>Download failed. Try again or download manually from GitHub.</p>
+                        <button class="updates-btn" @onclick="DownloadAndInstall">
+                            Retry Download
+                        </button>
+                        <button class="updates-btn secondary" @onclick="OpenUpdate">
+                            Download Manually
+                        </button>
+                    }
+                    else
+                    {
+                        <p>@_downloadState</p>
+                        <div class="updates-progress">
+                            <div class="updates-progress-bar" style="width: @_downloadProgress.ToString("F0")%"></div>
+                        </div>
+                        <button class="updates-btn secondary" @onclick="CancelDownload">
+                            Cancel
+                        </button>
+                    }
                 </div>
             }
             else
@@ -61,19 +94,28 @@
             }
         }
 
-        <button class="updates-btn secondary" @onclick="CheckUpdates" disabled="@_checking">
-            @(_checking ? "Checking..." : "Check for Updates")
-        </button>
+        @if (_downloadState == null)
+        {
+            <button class="updates-btn secondary" @onclick="CheckUpdates" disabled="@_checking">
+                @(_checking ? "Checking..." : "Check for Updates")
+            </button>
+        }
     </div>
 </div>
 
 @code {
     private bool _checking;
     private bool _checked;
+    private bool _downloading;
+    private string? _downloadState;
+    private double _downloadProgress;
+    private string? _installerPath;
     private UpdateInfo? _updateInfo;
 
     protected override async Task OnInitializedAsync()
     {
+        UpdateChecker.DownloadProgressChanged += OnDownloadProgress;
+        UpdateChecker.DownloadStateChanged += OnDownloadState;
         await CheckUpdates();
     }
 
@@ -88,22 +130,71 @@
         _checked = true;
     }
 
-    private async Task OpenUpdate()
+    private async Task DownloadAndInstall()
     {
-        if (_updateInfo == null)
+        if (_updateInfo == null || string.IsNullOrEmpty(_updateInfo.InstallerDownloadUrl))
         {
+            await OpenUpdate();
             return;
         }
+
+        _downloading = true;
+        _downloadProgress = 0;
+
+        _installerPath = await UpdateChecker.DownloadUpdateAsync(_updateInfo.InstallerDownloadUrl);
+        _downloading = false;
+    }
+
+    private void InstallUpdate()
+    {
+        if (string.IsNullOrEmpty(_installerPath)) return;
+
+        UpdateChecker.LaunchUpdater(_installerPath);
+
+        // Give the updater a moment to start, then close Castle
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(500);
+            Environment.Exit(0);
+        });
+    }
+
+    private void CancelDownload()
+    {
+        UpdateChecker.CancelDownload();
+        _downloading = false;
+        _downloadState = null;
+        _downloadProgress = 0;
+    }
+
+    private void OnDownloadProgress(double progress)
+    {
+        _downloadProgress = progress;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnDownloadState(string state)
+    {
+        _downloadState = state;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OpenUpdate()
+    {
+        if (_updateInfo == null) return;
 
         var url = !string.IsNullOrWhiteSpace(_updateInfo.InstallerDownloadUrl)
             ? _updateInfo.InstallerDownloadUrl
             : _updateInfo.ReleaseUrl;
 
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(url)) return;
 
         await Launcher.OpenAsync(url);
+    }
+
+    public void Dispose()
+    {
+        UpdateChecker.DownloadProgressChanged -= OnDownloadProgress;
+        UpdateChecker.DownloadStateChanged -= OnDownloadState;
     }
 }

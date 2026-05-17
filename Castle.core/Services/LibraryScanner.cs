@@ -1,7 +1,7 @@
 ﻿using Castle.Core.Interfaces;
 using Castle.Core.Models;
-using TagLib;
 using System.IO;
+using System.Security.Cryptography;
 
 namespace Castle.Core.Services;
 
@@ -77,10 +77,17 @@ public class LibraryScanner : ILibraryScanner
                         {
                             var cover = tag.Pictures[0];
                             var extension = GetImageExtensionFromMimeType(cover.MimeType);
-                            var coverFileName = $"cover_{Guid.NewGuid():N}{extension}";
+
+                            // Use content hash as filename to deduplicate across rescans
+                            var hash = ComputeHash(cover.Data.Data);
+                            var coverFileName = $"cover_{hash}{extension}";
                             coverPath = Path.Combine(_coversFolder, coverFileName);
 
-                            System.IO.File.WriteAllBytes(coverPath, cover.Data.Data);
+                            if (!System.IO.File.Exists(coverPath))
+                            {
+                                System.IO.File.WriteAllBytes(coverPath, cover.Data.Data);
+                            }
+
                             hasCoverArt = true;
                         }
                         catch
@@ -108,10 +115,17 @@ public class LibraryScanner : ILibraryScanner
                         try
                         {
                             var sourceFile = imageFiles.First();
-                            var coverFileName = $"cover_{Guid.NewGuid():N}{Path.GetExtension(sourceFile).ToLowerInvariant()}";
+                            var sourceBytes = System.IO.File.ReadAllBytes(sourceFile);
+                            var hash = ComputeHash(sourceBytes);
+                            var extension = Path.GetExtension(sourceFile).ToLowerInvariant();
+                            var coverFileName = $"cover_{hash}{extension}";
                             coverPath = Path.Combine(_coversFolder, coverFileName);
 
-                            System.IO.File.Copy(sourceFile, coverPath, true);
+                            if (!System.IO.File.Exists(coverPath))
+                            {
+                                System.IO.File.Copy(sourceFile, coverPath, true);
+                            }
+
                             hasCoverArt = true;
                         }
                         catch
@@ -180,6 +194,12 @@ public class LibraryScanner : ILibraryScanner
         }
 
         return songs;
+    }
+
+    private static string ComputeHash(byte[] data)
+    {
+        var hash = SHA256.HashData(data);
+        return Convert.ToHexStringLower(hash)[..16];
     }
 
     private static bool IsSupportedImageFile(string path)

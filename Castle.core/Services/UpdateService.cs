@@ -6,6 +6,10 @@ namespace Castle.Services;
 public class UpdateService
 {
     private readonly HttpClient _httpClient = new();
+    private CancellationTokenSource? _downloadCts;
+
+    public event Action<double>? DownloadProgressChanged;
+    public event Action<string>? DownloadStateChanged;
 
     public async Task<UpdateInfo?> CheckForUpdatesAsync()
     {
@@ -51,6 +55,86 @@ public class UpdateService
         {
             return null;
         }
+    }
+
+    public async Task<string?> DownloadUpdateAsync(string downloadUrl)
+    {
+        _downloadCts?.Cancel();
+        _downloadCts = new CancellationTokenSource();
+
+        try
+        {
+            DownloadStateChanged?.Invoke("Downloading...");
+
+            var tempDir = Path.Combine(Path.GetTempPath(), "CastleUpdate");
+            Directory.CreateDirectory(tempDir);
+            var tempFile = Path.Combine(tempDir, "CastleSetup.exe");
+
+            using var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, _downloadCts.Token);
+            response.EnsureSuccessStatusCode();
+
+            var totalBytes = response.Content.Headers.ContentLength ?? -1;
+            using var stream = await response.Content.ReadAsStreamAsync(_downloadCts.Token);
+            using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None);
+
+            var buffer = new byte[8192];
+            var downloadedBytes = 0L;
+            int bytesRead;
+
+            while ((bytesRead = await stream.ReadAsync(buffer, _downloadCts.Token)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), _downloadCts.Token);
+                downloadedBytes += bytesRead;
+
+                if (totalBytes > 0)
+                {
+                    var progress = (double)downloadedBytes / totalBytes * 100;
+                    DownloadProgressChanged?.Invoke(progress);
+                }
+            }
+
+            DownloadStateChanged?.Invoke("Ready to install");
+            return tempFile;
+        }
+        catch (OperationCanceledException)
+        {
+            DownloadStateChanged?.Invoke("Cancelled");
+            return null;
+        }
+        catch
+        {
+            DownloadStateChanged?.Invoke("Download failed");
+            return null;
+        }
+    }
+
+    public void CancelDownload()
+    {
+        _downloadCts?.Cancel();
+    }
+
+    public void LaunchUpdater(string installerPath)
+    {
+        var updaterExe = Path.Combine(AppContext.BaseDirectory, "Castle.Updater.exe");
+
+        if (!File.Exists(updaterExe))
+        {
+            // Fallback: just open the installer
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = installerPath,
+                UseShellExecute = true
+            });
+            return;
+        }
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = updaterExe,
+            Arguments = $"\"{installerPath}\"",
+            UseShellExecute = false,
+            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+        });
     }
 
     private static bool IsNewerVersion(string latest, string current)
