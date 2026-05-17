@@ -12,6 +12,7 @@ public class AudioEngine : IAudioEngine, IDisposable
     private float _cachedVolume = 1.0f;
     private int _eqHandle;
     private bool _eqEnabled;
+    private float[] _eqBands = new float[10];
     private int _compressorHandle;
     private bool _compressorEnabled;
     private string? _nextFilePath;
@@ -46,6 +47,10 @@ public class AudioEngine : IAudioEngine, IDisposable
             Initialize();
 
         float currentVol = Volume;
+        bool wasEqEnabled = _eqEnabled;
+        float[] savedBands = new float[10];
+        Array.Copy(_eqBands, savedBands, 10);
+
         Stop();
 
         _currentHandle = Bass.CreateStream(filePath);
@@ -55,6 +60,17 @@ public class AudioEngine : IAudioEngine, IDisposable
             _endSync = new SyncProcedure(OnSongEnded);
             Bass.ChannelSetSync(_currentHandle, SyncFlags.End, 0, _endSync);
             Volume = currentVol;
+
+            // Re-apply EQ if it was enabled before
+            if (wasEqEnabled)
+            {
+                EnableEqualizerInternal();
+                for (int i = 0; i < 10; i++)
+                {
+                    SetEqBandInternal(i, savedBands[i]);
+                }
+            }
+
             Bass.ChannelPlay(_currentHandle);
         }
     }
@@ -69,11 +85,25 @@ public class AudioEngine : IAudioEngine, IDisposable
         if (!string.IsNullOrWhiteSpace(_nextFilePath))
         {
             Stop();
+            bool wasEqEnabled = _eqEnabled;
+            float[] savedBands = new float[10];
+            Array.Copy(_eqBands, savedBands, 10);
+
             _currentHandle = Bass.CreateStream(_nextFilePath);
             if (_currentHandle != 0)
             {
                 _endSync = new SyncProcedure(OnSongEnded);
                 Bass.ChannelSetSync(_currentHandle, SyncFlags.End, 0, _endSync);
+
+                if (wasEqEnabled)
+                {
+                    EnableEqualizerInternal();
+                    for (int i = 0; i < 10; i++)
+                    {
+                        SetEqBandInternal(i, savedBands[i]);
+                    }
+                }
+
                 Bass.ChannelPlay(_currentHandle);
             }
             _nextFilePath = null;
@@ -91,7 +121,7 @@ public class AudioEngine : IAudioEngine, IDisposable
             Bass.ChannelStop(_currentHandle);
             Bass.StreamFree(_currentHandle);
             _currentHandle = 0;
-            _eqEnabled = false;
+            _eqHandle = 0;
             _compressorEnabled = false;
         }
     }
@@ -189,6 +219,11 @@ public class AudioEngine : IAudioEngine, IDisposable
     // ========== EQUALIZER ==========
     public void EnableEqualizer()
     {
+        EnableEqualizerInternal();
+    }
+
+    private void EnableEqualizerInternal()
+    {
         if (_currentHandle == 0 || _eqEnabled) return;
         _eqHandle = Bass.ChannelSetFX(_currentHandle, EffectType.PeakEQ, 1);
         _eqEnabled = true;
@@ -196,7 +231,14 @@ public class AudioEngine : IAudioEngine, IDisposable
 
     public void SetEqBand(int band, float gain)
     {
-        if (!_eqEnabled) return;
+        if (band < 0 || band >= 10) return;
+        _eqBands[band] = gain;
+        SetEqBandInternal(band, gain);
+    }
+
+    private void SetEqBandInternal(int band, float gain)
+    {
+        if (!_eqEnabled || band < 0 || band >= 10) return;
         var peq = new PeakEQParameters
         {
             fBandwidth = 1.0f,

@@ -1,0 +1,132 @@
+/* ========== SEARCH PAGE ========== */
+
+.search-page {
+    max-width: min(850px, 100%);
+    margin: 0 auto;
+}
+
+.search-hero {
+    margin-bottom: 20px;
+}
+
+    .search-hero h3 {
+        margin-bottom: 12px;
+    }
+
+.search-box {
+    display: flex;
+    gap: clamp(8px, 1vw, 12px);
+    margin: 16px 0;
+}
+
+.search-input {
+    min-width: 0;
+}
+
+.search-results {
+    margin-top: 16px;
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+    border-radius: 10px;
+    transition: background 0.15s;
+    backdrop-filter: var(--glass-blur, none);
+    -webkit-backdrop-filter: var(--glass-blur, none);
+}
+
+    .search-result-item:hover {
+        background: var(--bg-surface);
+    }
+
+.search-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.search-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.search-title {
+    color: var(--text-primary);
+    font-size: var(--ui-font-sm);
+    font-weight: 500;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-author {
+    color: var(--text-secondary);
+    font-size: var(--ui-font-xs);
+}
+
+.search-suggestions {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.suggestion-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    transition: background 0.1s;
+}
+
+    .suggestion-item:hover {
+        background: var(--accent-subtle);
+        color: var(--text-primary);
+    }
+
+.search-history {
+    margin-top: 12px;
+}
+
+.search-history-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.history-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.history-chip {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+    .history-chip:hover {
+        background: var(--accent-subtle);
+        color: var(--text-primary);
+        border-color: var(--accent);
+    }

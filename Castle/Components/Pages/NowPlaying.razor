@@ -12,7 +12,7 @@
 <div class="now-playing-page @(_controlsVisible ? "" : "np-immersive")" @onclick="HandleBackgroundClick">
     @if (Queue.CurrentSong == null)
     {
-        <div class="np-empty">
+        <div class="np-empty" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5;">
             <LiMusic Size="64" Stroke="#555" />
             <h2>Nothing Playing</h2>
             <p class="status-text">Play a song to see it here.</p>
@@ -37,46 +37,87 @@
             <span>Back</span>
         </button>
 
+        <button @onclick="ToggleFullscreen"
+                @onclick:stopPropagation
+                class="np-fullscreen-btn @(_controlsVisible ? "" : "hidden")"
+                title="@(_isFullscreen ? "Exit Fullscreen" : "Fullscreen")">
+            @if (_isFullscreen)
+            {
+                <LiMinimize2 Size="18" Stroke="#FFFFFF" />
+            }
+            else
+            {
+                <LiMaximize2 Size="18" Stroke="#FFFFFF" />
+            }
+        </button>
+
         @if (UpcomingSongs.Count > 0)
         {
-            <div class="np-queue-floating @(_controlsVisible ? "" : "np-queue-floating-immersive")"
+            <div class="np-queue-floating @(_controlsVisible ? "" : "np-queue-floating-immersive") @(_queueMinimized ? "np-queue-minimized" : "")"
                  @onclick:stopPropagation="true">
+                
                 <div class="np-queue-header">
                     <div>
                         <span>Up Next</span>
-                        <small>@UpcomingSongs.Count song@(UpcomingSongs.Count == 1 ? "" : "s") queued</small>
+                        <small>@UpcomingSongs.Count song@(UpcomingSongs.Count == 1 ? "" : "s")</small>
                     </div>
+                    <button class="np-queue-collapse-btn" @onclick="ToggleQueueMinimized" @onclick:stopPropagation="true" title="@(_queueMinimized ? "Expand" : "Minimize")">
+                        <LiChevronUp Size="16" Stroke="#BBBBBB" class="@(_queueMinimized ? "rotated" : "")" />
+                    </button>
                 </div>
 
-                <div class="np-queue-list">
-                    @foreach (var item in GetUpcomingQueueItems())
-                    {
-                        <button class="np-queue-item @(item.Index == 0 ? "next" : "")"
-                                @onclick="() => PlayQueueSong(item.Song)"
-                                title="Play @item.Song.Title">
-                            @if (!string.IsNullOrEmpty(item.Song.CoverArtPath))
-                            {
-                                <img src="@GetCoverUrl(item.Song.CoverArtPath)" class="np-queue-cover" />
-                            }
-                            else
-                            {
-                                <div class="np-queue-cover-placeholder">
-                                    <LiMusic Size="16" Stroke="#777" />
-                                </div>
-                            }
-
-                            <div class="np-queue-text">
-                                <span class="np-queue-title">@item.Song.Title</span>
-                                <span class="np-queue-artist">@item.Song.Artist</span>
+                @if (_queueMinimized && UpcomingSongs.Count > 0)
+                {
+                    var nextSong = UpcomingSongs[0];
+                    <div class="np-queue-mini-row" @onclick="() => PlayQueueSong(nextSong)" @onclick:stopPropagation="true">
+                        @if (!string.IsNullOrEmpty(nextSong.CoverArtPath))
+                        {
+                            <img src="@GetCoverUrl(nextSong.CoverArtPath)" class="np-queue-cover" />
+                        }
+                        else
+                        {
+                            <div class="np-queue-cover-placeholder">
+                                <LiMusic Size="12" Stroke="#777" />
                             </div>
-
-                            @if (item.Index == 0)
-                            {
-                                <span class="np-queue-badge">Next</span>
-                            }
-                        </button>
-                    }
-                </div>
+                        }
+                        <div class="np-queue-text">
+                            <span class="np-queue-title">@nextSong.Title</span>
+                            <span class="np-queue-artist">@nextSong.Artist</span>
+                        </div>
+                        <span class="np-queue-badge">Next</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="np-queue-list">
+                        @foreach (var item in GetUpcomingQueueItems())
+                        {
+                            <button class="np-queue-item @(item.Index == 0 ? "next" : "")"
+                                    @onclick="() => PlayQueueSong(item.Song)"
+                                    @onclick:stopPropagation="true"
+                                    title="Play @item.Song.Title">
+                                @if (!string.IsNullOrEmpty(item.Song.CoverArtPath))
+                                {
+                                    <img src="@GetCoverUrl(item.Song.CoverArtPath)" class="np-queue-cover" />
+                                }
+                                else
+                                {
+                                    <div class="np-queue-cover-placeholder">
+                                        <LiMusic Size="16" Stroke="#777" />
+                                    </div>
+                                }
+                                <div class="np-queue-text">
+                                    <span class="np-queue-title">@item.Song.Title</span>
+                                    <span class="np-queue-artist">@item.Song.Artist</span>
+                                </div>
+                                @if (item.Index == 0)
+                                {
+                                    <span class="np-queue-badge">Next</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
             </div>
         }
 
@@ -94,7 +135,6 @@
                         <LiMusic Size="80" Stroke="#555" />
                     </div>
                 }
-
                 <div class="np-art-overlay">
                     @if (Player.IsPlaying)
                     {
@@ -110,12 +150,10 @@
             <div class="np-info @(_controlsVisible ? "" : "hidden")">
                 <h1 class="np-title">@Queue.CurrentSong.Title</h1>
                 <p class="np-artist">@Queue.CurrentSong.Artist</p>
-
                 @if (!string.IsNullOrWhiteSpace(Queue.CurrentSong.Album) && Queue.CurrentSong.Album != "Unknown Album")
                 {
                     <p class="np-album">@Queue.CurrentSong.Album</p>
                 }
-
                 @if (!string.IsNullOrWhiteSpace(Queue.CurrentSong.Genre))
                 {
                     <p class="np-genre">@Queue.CurrentSong.Genre</p>
@@ -125,29 +163,12 @@
             <div class="np-bottom @(_controlsVisible ? "" : "hidden")">
                 <div class="np-seek">
                     <span class="np-time">@FormatTime(_position)</span>
-
-                    <input type="range"
-                           min="0"
-                           max="@((int)_duration)"
-                           step="1"
-                           value="@((int)_position)"
-                           @oninput="OnSeek"
-                           class="np-seek-bar" />
-
+                    <input type="range" min="0" max="@((int)_duration)" step="1" value="@((int)_position)" @oninput="OnSeek" class="np-seek-bar" />
                     <span class="np-time">@FormatTime(_duration)</span>
                 </div>
-
                 <div class="np-controls">
-                    <button @onclick="() => Queue.ToggleShuffle()"
-                            class="np-ctrl-btn @(Queue.IsShuffled ? "active" : "")"
-                            title="Shuffle">
-                        <LiShuffle Size="20" Stroke="#BBBBBB" />
-                    </button>
-
-                    <button @onclick="() => Player.Previous()" class="np-ctrl-btn" title="Previous">
-                        <LiSkipBack Size="26" Stroke="#FFFFFF" />
-                    </button>
-
+                    <button @onclick="() => Queue.ToggleShuffle()" class="np-ctrl-btn @(Queue.IsShuffled ? "active" : "")" title="Shuffle"><LiShuffle Size="20" Stroke="#BBBBBB" /></button>
+                    <button @onclick="() => Player.Previous()" class="np-ctrl-btn" title="Previous"><LiSkipBack Size="26" Stroke="#FFFFFF" /></button>
                     <button @onclick="() => Player.PlayPause()" class="np-play-btn" title="Play/Pause">
                         @if (Player.IsPlaying)
                         {
@@ -155,44 +176,28 @@
                         }
                         else
                         {
+
                             <LiPlay Size="32" Stroke="#FFFFFF" />
                         }
                     </button>
-
-                    <button @onclick="() => Player.Next()" class="np-ctrl-btn" title="Next">
-                        <LiSkipForward Size="26" Stroke="#FFFFFF" />
-                    </button>
-
-                    <button @onclick="() => Queue.CycleRepeat()"
-                            class="np-ctrl-btn @(Queue.Repeat != RepeatMode.Off ? "active" : "")"
-                            title="Repeat">
+                    <button @onclick="() => Player.Next()" class="np-ctrl-btn" title="Next"><LiSkipForward Size="26" Stroke="#FFFFFF" /></button>
+                    <button @onclick="() => Queue.CycleRepeat()" class="np-ctrl-btn @(Queue.Repeat != RepeatMode.Off ? "active" : "")" title="Repeat">
                         @if (Queue.Repeat == RepeatMode.RepeatOne)
                         {
                             <LiRepeat1 Size="20" Stroke="#BBBBBB" />
                         }
                         else
                         {
+
                             <LiRepeat Size="20" Stroke="#BBBBBB" />
                         }
                     </button>
-
-                    <button @onclick="ToggleFavorite"
-                            class="np-ctrl-btn @(_isFavorite ? "active" : "")"
-                            title="Favorite">
-                        <LiHeart Size="20"
-                                 Stroke="@(_isFavorite ? "var(--accent)" : "#BBBBBB")"
-                                 Fill="@(_isFavorite ? "var(--accent)" : "none")" />
+                    <button @onclick="ToggleFavorite" class="np-ctrl-btn @(_isFavorite ? "active" : "")" title="Favorite">
+                        <LiHeart Size="20" Stroke="@(_isFavorite ? "var(--accent)" : "#BBBBBB")" Fill="@(_isFavorite ? "var(--accent)" : "none")" />
                     </button>
-
                     <div class="np-volume-inline">
                         <LiVolume2 Size="14" Stroke="#999" />
-
-                        <input type="range"
-                               min="0"
-                               max="100"
-                               value="@((int)(Player.GetVolume() * 100))"
-                               @oninput="OnVolumeChange"
-                               class="np-volume-mini" />
+                        <input type="range" min="0" max="100" value="@((int)(Player.GetVolume() * 100))" @oninput="OnVolumeChange" class="np-volume-mini" />
                     </div>
                 </div>
             </div>
@@ -203,53 +208,28 @@
                     var lyrics = Player.CurrentLyrics;
                     var hasTimestamps = lyrics.Any(l => l.Timestamp > TimeSpan.Zero);
                     var activeIndex = 0;
-
                     if (hasTimestamps)
                     {
                         for (int i = 0; i < lyrics.Count; i++)
                         {
-                            if (_position >= lyrics[i].Timestamp.TotalSeconds)
-                            {
-                                activeIndex = i;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            if (_position >= lyrics[i].Timestamp.TotalSeconds) { activeIndex = i; } else { break; }
                         }
                     }
                     else
                     {
                         var progress = _duration > 0 ? _position / _duration : 0;
                         activeIndex = (int)(progress * lyrics.Count);
-
-                        if (activeIndex >= lyrics.Count)
-                        {
-                            activeIndex = lyrics.Count - 1;
-                        }
-
-                        if (activeIndex < 0)
-                        {
-                            activeIndex = 0;
-                        }
+                        if (activeIndex >= lyrics.Count) activeIndex = lyrics.Count - 1;
+                        if (activeIndex < 0) activeIndex = 0;
                     }
-
                     var startIndex = Math.Max(0, activeIndex - 2);
                     var endIndex = Math.Min(lyrics.Count - 1, activeIndex + 4);
-
                     <div class="np-lyrics-window">
                         <div class="np-lyrics-scroll" @key="activeIndex">
                             @for (int i = startIndex; i <= endIndex; i++)
                             {
-                                var lineClass = i == activeIndex
-                                    ? "active"
-                                    : Math.Abs(i - activeIndex) == 1
-                                        ? "near"
-                                        : "far";
-
-                                <p class="np-lyric-line @lineClass">
-                                    @lyrics[i].Text
-                                </p>
+                                var lineClass = i == activeIndex ? "active" : Math.Abs(i - activeIndex) == 1 ? "near" : "far";
+                                <p class="np-lyric-line @lineClass">@lyrics[i].Text</p>
                             }
                         </div>
                     </div>
@@ -260,16 +240,14 @@
 </div>
 
 @code {
-    private const string VizStyleKey = "castle_viz_style";
-    private const string VizSpeedKey = "castle_viz_speed";
-    private const string VizIntensityKey = "castle_viz_intensity";
-
     private double _position;
     private double _duration;
     private System.Timers.Timer? _timer;
     private System.Timers.Timer? _hideControlsTimer;
     private bool _controlsVisible = true;
     private bool _isFavorite;
+    private bool _queueMinimized;
+    private bool _isFullscreen;
 
     private List<Song> UpcomingSongs => Queue.GetUpcoming(5);
 
@@ -286,27 +264,9 @@
         UpdateFavorite();
     }
 
-    private List<QueuePreviewItem> GetUpcomingQueueItems()
-    {
-        return UpcomingSongs
-            .Select((song, index) => new QueuePreviewItem
-            {
-                Song = song,
-                Index = index
-            })
-            .ToList();
-    }
-
-    private void RefreshFavorite()
-    {
-        UpdateFavorite();
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void UpdateFavorite()
-    {
-        _isFavorite = Player.IsCurrentSongFavorite();
-    }
+    private List<QueuePreviewItem> GetUpcomingQueueItems() => UpcomingSongs.Select((song, index) => new QueuePreviewItem { Song = song, Index = index }).ToList();
+    private void RefreshFavorite() { UpdateFavorite(); InvokeAsync(StateHasChanged); }
+    private void UpdateFavorite() { _isFavorite = Player.IsCurrentSongFavorite(); }
 
     protected override async void OnAfterRender(bool firstRender)
     {
@@ -315,133 +275,67 @@
             _timer = new System.Timers.Timer(50);
             _timer.Elapsed += async (_, _) =>
             {
-                try
-                {
-                    _position = Player.GetPosition();
-                    _duration = Player.GetDuration();
-
-                    await JS.InvokeVoidAsync("drawVisualizer", Array.Empty<float>(), _position, _duration);
-                    await InvokeAsync(StateHasChanged);
-                }
-                catch
-                {
-                }
+                try { _position = Player.GetPosition(); _duration = Player.GetDuration(); await JS.InvokeVoidAsync("drawVisualizer", Array.Empty<float>(), _position, _duration); await InvokeAsync(StateHasChanged); } catch { }
             };
-
-            _timer.AutoReset = true;
-            _timer.Start();
-
+            _timer.AutoReset = true; _timer.Start();
             var theme = ThemeService.CurrentTheme;
-            var style = Preferences.Get(VizStyleKey, "bars");
-            var speed = Preferences.Get(VizSpeedKey, 2.0);
-            var intensity = Preferences.Get(VizIntensityKey, 0.6);
-
-            await JS.InvokeVoidAsync("startVisualizer", new
-            {
-                style,
-                color = theme.Accent,
-                secondary = theme.AccentHover,
-                speed,
-                intensity
-            });
+            await JS.InvokeVoidAsync("startVisualizer", new { style = Preferences.Get("castle_viz_style", "bars"), color = theme.Accent, secondary = theme.AccentHover, speed = Preferences.Get("castle_viz_speed", 2.0), intensity = Preferences.Get("castle_viz_intensity", 0.6) });
         }
     }
 
-    private void HandleBackgroundClick()
+#if WINDOWS
+    private void ToggleFullscreen()
     {
-        GoBack();
+        var w = Application.Current?.Windows.FirstOrDefault();
+        if (w?.Handler?.PlatformView is Microsoft.UI.Xaml.Window nw)
+        {
+            var h = WinRT.Interop.WindowNative.GetWindowHandle(nw);
+            var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(h);
+            var aw = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(id);
+            if (aw != null) { if (_isFullscreen) aw.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default); else aw.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen); _isFullscreen = !_isFullscreen; }
+        }
     }
+    private void ExitFullscreen()
+    {
+        if (!_isFullscreen) return;
+        var w = Application.Current?.Windows.FirstOrDefault();
+        if (w?.Handler?.PlatformView is Microsoft.UI.Xaml.Window nw)
+        {
+            var h = WinRT.Interop.WindowNative.GetWindowHandle(nw);
+            var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(h);
+            Microsoft.UI.Windowing.AppWindow.GetFromWindowId(id)?.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+            _isFullscreen = false;
+        }
+    }
+#else
+    private void ToggleFullscreen() { }
+    private void ExitFullscreen() { }
+#endif
 
-    private void HandleContentClick()
-    {
-        _controlsVisible = !_controlsVisible;
-        ResetHideTimer();
-    }
+    private void ToggleQueueMinimized() { _queueMinimized = !_queueMinimized; ResetHideTimer(); }
+    private void HandleBackgroundClick() { GoBack(); }
+    private void HandleContentClick() { _controlsVisible = !_controlsVisible; ResetHideTimer(); }
 
     private void ResetHideTimer()
     {
-        _hideControlsTimer?.Stop();
-        _hideControlsTimer?.Dispose();
-
+        _hideControlsTimer?.Stop(); _hideControlsTimer?.Dispose();
         _hideControlsTimer = new System.Timers.Timer(4000);
-        _hideControlsTimer.Elapsed += (_, _) =>
-        {
-            _controlsVisible = false;
-            InvokeAsync(StateHasChanged);
-        };
-
-        _hideControlsTimer.AutoReset = false;
-        _hideControlsTimer.Start();
+        _hideControlsTimer.Elapsed += (_, _) => { _controlsVisible = false; InvokeAsync(StateHasChanged); };
+        _hideControlsTimer.AutoReset = false; _hideControlsTimer.Start();
     }
 
-    private void PlayQueueSong(Song song)
-    {
-        var selected = Queue.JumpToSong(song);
-
-        if (selected != null)
-        {
-            Player.PlaySong(selected);
-            UpdateFavorite();
-            ResetHideTimer();
-            InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private void ToggleFavorite()
-    {
-        Player.ToggleFavorite();
-        _isFavorite = !_isFavorite;
-    }
-
-    private void OnSeek(ChangeEventArgs e)
-    {
-        var v = Convert.ToDouble(e.Value ?? 0);
-        Player.Seek(v);
-        _position = v;
-        ResetHideTimer();
-    }
-
-    private void OnVolumeChange(ChangeEventArgs e)
-    {
-        Player.SetVolume(Convert.ToInt32(e.Value ?? 50) / 100f);
-        Player.SaveVolume();
-    }
-
-    private void GoBack()
-    {
-        Navigation.NavigateTo("/");
-    }
-
-    private string GetCoverUrl(string? path)
-{
-    return CoverArtService.GetCoverUrl(path);
-}
-
-    private string FormatTime(double s)
-    {
-        if (double.IsNaN(s) || double.IsInfinity(s) || s < 0)
-        {
-            return "0:00";
-        }
-
-        var t = TimeSpan.FromSeconds(s);
-        return t.Minutes + ":" + t.Seconds.ToString("D2");
-    }
+    private void PlayQueueSong(Song song) { var s = Queue.JumpToSong(song); if (s != null) { Player.PlaySong(s); UpdateFavorite(); ResetHideTimer(); InvokeAsync(StateHasChanged); } }
+    private void ToggleFavorite() { Player.ToggleFavorite(); _isFavorite = !_isFavorite; }
+    private void OnSeek(ChangeEventArgs e) { var v = Convert.ToDouble(e.Value ?? 0); Player.Seek(v); _position = v; ResetHideTimer(); }
+    private void OnVolumeChange(ChangeEventArgs e) { Player.SetVolume(Convert.ToInt32(e.Value ?? 50) / 100f); Player.SaveVolume(); }
+    private void GoBack() { ExitFullscreen(); Navigation.NavigateTo("/"); }
+    private string GetCoverUrl(string? path) => CoverArtService.GetCoverUrl(path);
+    private string FormatTime(double s) { if (double.IsNaN(s) || double.IsInfinity(s) || s < 0) return "0:00"; var t = TimeSpan.FromSeconds(s); return t.Minutes + ":" + t.Seconds.ToString("D2"); }
 
     public void Dispose()
     {
-        _timer?.Stop();
-        _timer?.Dispose();
-
-        _hideControlsTimer?.Stop();
-        _hideControlsTimer?.Dispose();
-
-        try
-        {
-            JS.InvokeVoidAsync("stopVisualizer");
-        }
-        catch
-        {
-        }
+        _timer?.Stop(); _timer?.Dispose();
+        _hideControlsTimer?.Stop(); _hideControlsTimer?.Dispose();
+        try { JS.InvokeVoidAsync("stopVisualizer"); } catch { }
     }
 }

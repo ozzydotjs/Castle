@@ -134,6 +134,7 @@ public class PlaylistService
         _playlistRepo.Update(playlist);
 
         RefreshCurrentPlaylistIfNeeded(playlistId);
+        RegeneratePlaylistCover(playlistId);
 
         PlaylistChanged?.Invoke();
     }
@@ -158,6 +159,7 @@ public class PlaylistService
         _playlistRepo.Update(playlist);
 
         RefreshCurrentPlaylistIfNeeded(playlistId);
+        RegeneratePlaylistCover(playlistId);
 
         PlaylistChanged?.Invoke();
     }
@@ -222,6 +224,42 @@ public class PlaylistService
 
         PlaylistChanged?.Invoke();
     }
+
+    // ========== PLAYLIST COVER ==========
+
+    public string GetPlaylistCoverUrl(string playlistId)
+    {
+        var coverPath = CoverArtService.GetPlaylistCoverPath(playlistId);
+        if (!string.IsNullOrEmpty(coverPath))
+        {
+            return CoverArtService.GetCoverUrl(coverPath);
+        }
+        return string.Empty;
+    }
+
+    public void SetCustomPlaylistCover(string playlistId, string imagePath)
+    {
+        CoverArtService.SetCustomPlaylistCover(playlistId, imagePath);
+        PlaylistChanged?.Invoke();
+    }
+
+    public void RegeneratePlaylistCover(string playlistId)
+    {
+        var playlist = _playlistRepo.GetById(playlistId);
+        if (playlist == null) return;
+
+        var coverPaths = playlist.SongIds
+            .Select(id => _songRepo.GetById(id))
+            .Where(s => s != null)
+            .Select(s => s!.CoverArtPath)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Cast<string>()
+            .ToList();
+
+        CoverArtService.GeneratePlaylistCover(playlistId, coverPaths);
+    }
+
+    // ========== PRIVATE HELPERS ==========
 
     private List<Song> BuildSongListFromPlaylist(Playlist playlist, bool cleanMissingSongs)
     {

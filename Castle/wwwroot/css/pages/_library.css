@@ -1,0 +1,28 @@
+/* ========== LIBRARY / HOME PAGE ========== */
+
+.library-header {
+    /* wrapper for the h3 + top-bar on Home page */
+}
+
+.discover-section {
+    animation: contentReveal var(--anim-slow) var(--anim-ease);
+}
+
+    .discover-section.refreshing {
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity var(--anim-fast) var(--anim-ease), transform var(--anim-fast) var(--anim-ease);
+    }
+
+    .discover-section.refreshed {
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity var(--anim-normal) var(--anim-ease), transform var(--anim-normal) var(--anim-ease);
+    }
+
+.discover-loading {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}

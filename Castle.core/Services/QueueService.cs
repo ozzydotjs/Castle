@@ -6,176 +6,187 @@ public enum RepeatMode { Off, RepeatAll, RepeatOne }
 
 public class QueueService
 {
-    private List<Song> _originalQueue = new();
-    private List<Song> _shuffledQueue = new();
-    private int _currentIndex = -1;
+    private List<Song> _queue = new();
     private readonly Random _random = new();
+    private List<Song> _originalOrder = new();
 
     public RepeatMode Repeat { get; set; } = RepeatMode.Off;
     public bool IsShuffled { get; private set; }
-    public int Count => _shuffledQueue.Count;
-    public int CurrentIndex => _currentIndex;
+    public int Count => _queue.Count;
 
-    public Song? CurrentSong =>
-        _currentIndex >= 0 && _currentIndex < _shuffledQueue.Count
-            ? _shuffledQueue[_currentIndex]
-            : null;
-
+    public Song? CurrentSong { get; private set; }
     public event Action? QueueChanged;
 
-    public void SetQueue(List<Song> songs)
+    public void SetQueue(List<Song> songs, int startIndex = 0)
     {
-        _originalQueue = new List<Song>(songs);
-        _shuffledQueue = new List<Song>(songs);
-        _currentIndex = songs.Count > 0 ? 0 : -1;
+        if (songs == null || songs.Count == 0)
+        {
+            Clear();
+            return;
+        }
+
+        _originalOrder = new List<Song>(songs);
+
+        if (IsShuffled)
+        {
+            _queue = songs.OrderBy(_ => _random.Next()).ToList();
+        }
+        else
+        {
+            _queue = new List<Song>(songs);
+        }
+
+        // Extract the starting song and remove everything before it
+        if (startIndex >= 0 && startIndex < _queue.Count)
+        {
+            CurrentSong = _queue[startIndex];
+            _queue.RemoveRange(0, startIndex + 1);
+        }
+        else if (_queue.Count > 0)
+        {
+            CurrentSong = _queue[0];
+            _queue.RemoveAt(0);
+        }
+        else
+        {
+            CurrentSong = null;
+        }
 
         QueueChanged?.Invoke();
     }
 
     public Song? Next()
     {
-        if (_shuffledQueue.Count == 0)
-        {
-            return null;
-        }
-
         if (Repeat == RepeatMode.RepeatOne && CurrentSong != null)
         {
             QueueChanged?.Invoke();
             return CurrentSong;
         }
 
-        _currentIndex++;
-
-        if (_currentIndex >= _shuffledQueue.Count)
+        if (_queue.Count > 0)
         {
-            if (Repeat == RepeatMode.RepeatAll)
+            CurrentSong = _queue[0];
+            _queue.RemoveAt(0);
+            QueueChanged?.Invoke();
+            return CurrentSong;
+        }
+
+        if (Repeat == RepeatMode.RepeatAll && _originalOrder.Count > 0)
+        {
+            RefillFromOriginal();
+
+            if (_queue.Count > 0)
             {
-                _currentIndex = 0;
-            }
-            else
-            {
-                _currentIndex = _shuffledQueue.Count - 1;
+                CurrentSong = _queue[0];
+                _queue.RemoveAt(0);
                 QueueChanged?.Invoke();
-                return null;
+                return CurrentSong;
             }
         }
 
+        CurrentSong = null;
         QueueChanged?.Invoke();
-        return CurrentSong;
+        return null;
     }
 
     public Song? Previous()
     {
-        if (_shuffledQueue.Count == 0)
+        if (CurrentSong != null)
         {
-            return null;
+            QueueChanged?.Invoke();
+            return CurrentSong;
         }
 
-        _currentIndex--;
-
-        if (_currentIndex < 0)
-        {
-            _currentIndex = Repeat == RepeatMode.RepeatAll
-                ? _shuffledQueue.Count - 1
-                : 0;
-        }
-
-        QueueChanged?.Invoke();
-        return CurrentSong;
+        return null;
     }
 
-    public Song? JumpTo(int index)
+    public Song? SkipTo(int index)
     {
-        if (index < 0 || index >= _shuffledQueue.Count)
-        {
+        if (index < 0 || index >= _queue.Count)
             return null;
-        }
 
-        _currentIndex = index;
-
+        var song = _queue[index];
+        _queue.RemoveAt(index);
+        CurrentSong = song;
         QueueChanged?.Invoke();
-        return CurrentSong;
+        return song;
     }
 
     public Song? JumpToSong(Song song)
     {
-        var index = FindSongIndex(_shuffledQueue, song);
-        return JumpTo(index);
-    }
+        var index = _queue.FindIndex(s => IsSameSong(s, song));
+        if (index >= 0)
+            return SkipTo(index);
 
-    public List<Song> GetUpcoming(int count = 5)
-    {
-        if (_currentIndex < 0 || _currentIndex >= _shuffledQueue.Count - 1)
-        {
-            return new List<Song>();
-        }
-
-        return _shuffledQueue
-            .Skip(_currentIndex + 1)
-            .Take(count)
-            .ToList();
+        // Song not in queue, play it directly
+        CurrentSong = song;
+        QueueChanged?.Invoke();
+        return song;
     }
 
     public void Add(Song song)
     {
-        _originalQueue.Add(song);
+        if (song == null) return;
 
-        if (IsShuffled)
+        _queue.Add(song);
+        _originalOrder.Add(song);
+
+        if (CurrentSong == null && _queue.Count > 0)
         {
-            _shuffledQueue.Add(song);
+            CurrentSong = _queue[0];
+            _queue.RemoveAt(0);
         }
+
+        QueueChanged?.Invoke();
+    }
+
+    public void AddRange(List<Song> songs)
+    {
+        if (songs == null || songs.Count == 0) return;
+
+        _queue.AddRange(songs);
+        _originalOrder.AddRange(songs);
+
+        if (CurrentSong == null && _queue.Count > 0)
+        {
+            CurrentSong = _queue[0];
+            _queue.RemoveAt(0);
+        }
+
+        QueueChanged?.Invoke();
+    }
+
+    public void PlayNext(Song song)
+    {
+        if (song == null) return;
+
+        _queue.Insert(0, song);
+
+        var currentIndex = _originalOrder.FindIndex(s => IsSameSong(s, CurrentSong));
+        if (currentIndex >= 0)
+            _originalOrder.Insert(currentIndex + 1, song);
         else
-        {
-            _shuffledQueue = new List<Song>(_originalQueue);
-            _currentIndex = FindSongIndex(_shuffledQueue, CurrentSong);
-        }
-
-        if (_currentIndex < 0 && _shuffledQueue.Count > 0)
-        {
-            _currentIndex = 0;
-        }
+            _originalOrder.Add(song);
 
         QueueChanged?.Invoke();
     }
 
     public void RemoveAt(int index)
     {
-        if (index < 0 || index >= _shuffledQueue.Count)
-        {
-            return;
-        }
+        if (index < 0 || index >= _queue.Count) return;
 
-        var currentSong = CurrentSong;
-        var songToRemove = _shuffledQueue[index];
+        var song = _queue[index];
+        _queue.RemoveAt(index);
+        _originalOrder.RemoveAll(s => IsSameSong(s, song));
 
-        _shuffledQueue.RemoveAt(index);
+        QueueChanged?.Invoke();
+    }
 
-        _originalQueue.RemoveAll(song =>
-            IsSameSong(song, songToRemove));
-
-        if (_shuffledQueue.Count == 0)
-        {
-            _currentIndex = -1;
-        }
-        else if (currentSong != null)
-        {
-            var newIndex = FindSongIndex(_shuffledQueue, currentSong);
-
-            if (newIndex >= 0)
-            {
-                _currentIndex = newIndex;
-            }
-            else
-            {
-                _currentIndex = Math.Min(index, _shuffledQueue.Count - 1);
-            }
-        }
-        else
-        {
-            _currentIndex = Math.Min(index, _shuffledQueue.Count - 1);
-        }
-
+    public void Clear()
+    {
+        _queue.Clear();
+        _originalOrder.Clear();
+        CurrentSong = null;
         QueueChanged?.Invoke();
     }
 
@@ -183,25 +194,14 @@ public class QueueService
     {
         IsShuffled = !IsShuffled;
 
-        var current = CurrentSong;
-
-        _shuffledQueue = IsShuffled
-            ? _originalQueue.OrderBy(_ => _random.Next()).ToList()
-            : new List<Song>(_originalQueue);
-
-        if (current != null)
+        if (IsShuffled)
         {
-            _currentIndex = FindSongIndex(_shuffledQueue, current);
+            _queue = _queue.OrderBy(_ => _random.Next()).ToList();
         }
-
-        if (_currentIndex < 0 && _shuffledQueue.Count > 0)
+        else
         {
-            _currentIndex = 0;
-        }
-
-        if (_shuffledQueue.Count == 0)
-        {
-            _currentIndex = -1;
+            var remaining = new HashSet<string>(_queue.Select(s => s.FilePath ?? ""));
+            _queue = _originalOrder.Where(s => remaining.Contains(s.FilePath ?? "")).ToList();
         }
 
         QueueChanged?.Invoke();
@@ -221,23 +221,38 @@ public class QueueService
         return Repeat;
     }
 
+    public List<Song> GetUpcoming(int count = 50)
+    {
+        return _queue.Take(count).ToList();
+    }
+
     public List<Song> GetAll()
     {
-        return new List<Song>(_shuffledQueue);
+        return new List<Song>(_queue);
     }
 
-    private int FindSongIndex(List<Song> songs, Song? target)
+    public bool HasNext()
     {
-        if (target == null)
+        return _queue.Count > 0 ||
+               (Repeat == RepeatMode.RepeatAll && _originalOrder.Count > 0) ||
+               Repeat == RepeatMode.RepeatOne;
+    }
+
+    private void RefillFromOriginal()
+    {
+        if (IsShuffled)
         {
-            return -1;
+            _queue = _originalOrder.OrderBy(_ => _random.Next()).ToList();
         }
-
-        return songs.FindIndex(song => IsSameSong(song, target));
+        else
+        {
+            _queue = new List<Song>(_originalOrder);
+        }
     }
 
-    private bool IsSameSong(Song a, Song b)
+    private bool IsSameSong(Song? a, Song? b)
     {
+        if (a == null || b == null) return false;
         return a.Id == b.Id ||
                string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase);
     }

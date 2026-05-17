@@ -2,7 +2,7 @@
 
 public static class AppVersion
 {
-    public const string Current = "v0.1.0";
+    public const string Current = "v1.0.0";
 
     public const string GitHubOwner = "ozzydotjs";
     public const string GitHubRepo = "Castle";

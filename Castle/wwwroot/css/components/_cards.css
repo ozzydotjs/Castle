@@ -1,0 +1,219 @@
+/* ========== CARDS ========== */
+
+.suggested-section {
+    margin-bottom: 32px;
+}
+
+.suggested-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--ui-card-min), 1fr));
+    gap: var(--ui-card-gap);
+}
+
+.suggested-card {
+    background: var(--bg-surface);
+    border-radius: var(--ui-radius-md);
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    min-height: clamp(130px, 13vh, 160px);
+    opacity: 0;
+    transform: translateY(12px);
+    animation: cardEnter var(--anim-normal) var(--anim-ease) forwards;
+    backdrop-filter: var(--glass-blur, none);
+    -webkit-backdrop-filter: var(--glass-blur, none);
+}
+
+    .suggested-card:nth-child(1) {
+        animation-delay: calc(var(--anim-stagger) * 0);
+    }
+
+    .suggested-card:nth-child(2) {
+        animation-delay: calc(var(--anim-stagger) * 1);
+    }
+
+    .suggested-card:nth-child(3) {
+        animation-delay: calc(var(--anim-stagger) * 2);
+    }
+
+    .suggested-card:nth-child(4) {
+        animation-delay: calc(var(--anim-stagger) * 3);
+    }
+
+    .suggested-card:nth-child(5) {
+        animation-delay: calc(var(--anim-stagger) * 4);
+    }
+
+    .suggested-card:nth-child(6) {
+        animation-delay: calc(var(--anim-stagger) * 5);
+    }
+
+    .suggested-card:nth-child(7) {
+        animation-delay: calc(var(--anim-stagger) * 6);
+    }
+
+    .suggested-card:nth-child(8) {
+        animation-delay: calc(var(--anim-stagger) * 7);
+    }
+
+    .suggested-card:hover {
+        background: var(--accent);
+        border-color: var(--accent-active);
+        transform: translateY(-2px);
+    }
+
+    .suggested-card .card-cover {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        object-fit: cover;
+        margin-bottom: 10px;
+    }
+
+    .suggested-card .card-cover-placeholder {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        background: var(--bg-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+
+    .suggested-card .card-title {
+        color: var(--text-primary);
+        font-size: var(--ui-font-sm);
+        font-weight: 600;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .suggested-card .card-subtitle {
+        color: var(--text-secondary);
+        font-size: var(--ui-font-xs);
+    }
+
+/* Playlist cards */
+.playlist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--ui-card-min), 1fr));
+    gap: var(--ui-card-gap);
+    margin-bottom: 32px;
+}
+
+.playlist-card {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: cardEnter var(--anim-normal) var(--anim-ease) forwards;
+    background: var(--bg-surface);
+    border-radius: var(--ui-radius-md);
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    min-height: clamp(130px, 13vh, 160px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    overflow: hidden;
+    backdrop-filter: var(--glass-blur, none);
+    -webkit-backdrop-filter: var(--glass-blur, none);
+}
+
+    .playlist-card:nth-child(1) {
+        animation-delay: calc(var(--anim-stagger) * 0);
+    }
+
+    .playlist-card:nth-child(2) {
+        animation-delay: calc(var(--anim-stagger) * 1);
+    }
+
+    .playlist-card:nth-child(3) {
+        animation-delay: calc(var(--anim-stagger) * 2);
+    }
+
+    .playlist-card:nth-child(4) {
+        animation-delay: calc(var(--anim-stagger) * 3);
+    }
+
+    .playlist-card:nth-child(5) {
+        animation-delay: calc(var(--anim-stagger) * 4);
+    }
+
+    .playlist-card:nth-child(6) {
+        animation-delay: calc(var(--anim-stagger) * 5);
+    }
+
+    .playlist-card img,
+    .playlist-card .playlist-thumb {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        object-fit: cover;
+        margin-bottom: 10px;
+        flex-shrink: 0;
+    }
+
+    .playlist-card .playlist-title {
+        color: var(--text-primary);
+        font-size: var(--ui-font-sm);
+        font-weight: 600;
+        margin-bottom: 4px;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .playlist-card .playlist-subtitle {
+        color: var(--text-secondary);
+        font-size: var(--ui-font-xs);
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .playlist-card:hover {
+        background: var(--accent);
+        border-color: var(--accent-active);
+        transform: translateY(-2px);
+    }
+
+    .suggested-card:hover,
+    .playlist-card:hover {
+        transform: translateY(-2px);
+        transition: transform var(--anim-fast) var(--anim-ease);
+    }
+
+/* Dashboard cards */
+.dash-card {
+    background: var(--bg-surface);
+    border-radius: var(--ui-radius-md);
+    padding: 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: var(--glass-blur, none);
+    -webkit-backdrop-filter: var(--glass-blur, none);
+}
+
+.dash-card-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.dash-card-label {
+    font-size: var(--ui-font-xs);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}

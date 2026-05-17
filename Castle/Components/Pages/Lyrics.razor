@@ -5,6 +5,7 @@
 @implements IDisposable
 @inject PlaybackService Player
 @inject QueueService Queue
+@inject IJSRuntime JS
 
 <h3><LiMusic Size="20" Stroke="#BBBBBB" /> LYRICS</h3>
 
@@ -37,26 +38,32 @@ else
     }
     else if (_hasTimestamps)
     {
-        <div class="lyrics-container">
-            @foreach (var line in _lyrics)
+        <div class="lyrics-scroll-container" @ref="_scrollContainer">
+            <div class="lyrics-spacer" style="height: 40vh;"></div>
+            @for (int i = 0; i < _lyrics.Count; i++)
             {
-                var isActive = _currentPosition >= line.Timestamp.TotalSeconds &&
-                               _currentPosition < line.Timestamp.TotalSeconds + 5;
-                <p class="lyric-line @(isActive ? "active" : "")" 
-                   style="font-size: @(isActive ? "22px" : "14px"); 
-                          opacity: @(isActive ? "1" : "0.4");">
-                    @line.Text
-                </p>
+                var line = _lyrics[i];
+                var isActive = i == _activeLineIndex;
+                var isPast = i < _activeLineIndex;
+                <div class="lyric-line-wrapper @(isActive ? "active" : "") @(isPast ? "past" : "")"
+                     style="transition-delay: @(isActive ? "0s" : "0.1s")">
+                    <p class="lyric-line @(isActive ? "active-text" : "")">@line.Text</p>
+                </div>
             }
+            <div class="lyrics-spacer" style="height: 40vh;"></div>
         </div>
     }
     else
     {
-        <div class="lyrics-container">
+        <div class="lyrics-scroll-container">
+            <div class="lyrics-spacer" style="height: 40vh;"></div>
             @foreach (var line in _lyrics)
             {
-                <p class="lyric-line plain">@line.Text</p>
+                <div class="lyric-line-wrapper">
+                    <p class="lyric-line plain-text">@line.Text</p>
+                </div>
             }
+            <div class="lyrics-spacer" style="height: 40vh;"></div>
         </div>
     }
 }
@@ -68,12 +75,14 @@ else
     private bool _hasTimestamps;
     private System.Timers.Timer? _timer;
     private string _lastSongId = string.Empty;
+    private int _activeLineIndex = -1;
+    private ElementReference _scrollContainer;
 
     protected override void OnInitialized()
     {
         Player.LyricsLoaded += OnLyricsLoaded;
-        Queue.QueueChanged += () => InvokeAsync(LoadLyrics);
-        Player.StateChanged += () => InvokeAsync(StateHasChanged);
+        Queue.QueueChanged += OnQueueChanged;
+        Player.StateChanged += OnStateChanged;
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -83,28 +92,56 @@ else
             _timer = new System.Timers.Timer(100);
             _timer.Elapsed += async (_, _) =>
             {
-                _currentPosition = Player.GetPosition();
-                await InvokeAsync(StateHasChanged);
+                await UpdatePosition();
             };
             _timer.AutoReset = true;
             _timer.Start();
 
             if (Queue.CurrentSong != null)
             {
-                if (Player.CurrentLyrics != null && Player.CurrentLyrics.Count > 0)
-                {
-                    _lyrics = Player.CurrentLyrics;
-                    _hasTimestamps = Player.CurrentLyrics.Any(l => l.Timestamp > TimeSpan.Zero);
-                    _lastSongId = Queue.CurrentSong.Id;
-                    _isLoading = false;
-                    StateHasChanged();
-                }
-                else
-                {
-                    LoadLyrics();
-                }
+                LoadCurrentLyrics();
             }
         }
+    }
+
+    async Task UpdatePosition()
+    {
+        if (!_hasTimestamps || _lyrics.Count == 0) return;
+
+        _currentPosition = Player.GetPosition();
+        
+        // Find the active lyric line based on timestamp
+        var newActiveIndex = -1;
+        for (int i = _lyrics.Count - 1; i >= 0; i--)
+        {
+            if (_currentPosition >= _lyrics[i].Timestamp.TotalSeconds)
+            {
+                newActiveIndex = i;
+                break;
+            }
+        }
+
+        if (newActiveIndex != _activeLineIndex)
+        {
+            _activeLineIndex = newActiveIndex;
+            await InvokeAsync(StateHasChanged);
+            
+            // Smooth scroll to active line
+            if (_activeLineIndex >= 0)
+            {
+                await JS.InvokeVoidAsync("castleLyrics.scrollToLine", _scrollContainer);
+            }
+        }
+    }
+
+    async void OnQueueChanged()
+    {
+        await InvokeAsync(LoadCurrentLyrics);
+    }
+
+    async void OnStateChanged()
+    {
+        await InvokeAsync(StateHasChanged);
     }
 
     void OnLyricsLoaded()
@@ -113,30 +150,24 @@ else
         {
             if (Queue.CurrentSong != null && Player.CurrentLyrics != null)
             {
-                _lyrics = Player.CurrentLyrics;
-                _hasTimestamps = Player.CurrentLyrics.Any(l => l.Timestamp > TimeSpan.Zero);
-                _lastSongId = Queue.CurrentSong.Id;
-                _isLoading = false;
-                StateHasChanged();
+                UpdateLyricsFromPlayer();
             }
         });
     }
 
-    async Task LoadLyrics()
+    void LoadCurrentLyrics()
     {
         if (Queue.CurrentSong == null) return;
         if (Queue.CurrentSong.Id == _lastSongId && _lyrics.Count > 0) return;
 
         _lastSongId = Queue.CurrentSong.Id;
+        _activeLineIndex = -1;
         _lyrics.Clear();
         _hasTimestamps = false;
 
         if (Player.CurrentLyrics != null && Player.CurrentLyrics.Count > 0)
         {
-            _lyrics = Player.CurrentLyrics;
-            _hasTimestamps = Player.CurrentLyrics.Any(l => l.Timestamp > TimeSpan.Zero);
-            _isLoading = false;
-            StateHasChanged();
+            UpdateLyricsFromPlayer();
             return;
         }
 
@@ -144,9 +175,23 @@ else
         StateHasChanged();
     }
 
+    void UpdateLyricsFromPlayer()
+    {
+        if (Player.CurrentLyrics == null) return;
+        
+        _lyrics = Player.CurrentLyrics;
+        _hasTimestamps = Player.CurrentLyrics.Any(l => l.Timestamp > TimeSpan.Zero);
+        _isLoading = false;
+        _lastSongId = Queue.CurrentSong?.Id ?? string.Empty;
+        _activeLineIndex = -1;
+        StateHasChanged();
+    }
+
     public void Dispose()
     {
         Player.LyricsLoaded -= OnLyricsLoaded;
+        Queue.QueueChanged -= OnQueueChanged;
+        Player.StateChanged -= OnStateChanged;
         _timer?.Stop();
         _timer?.Dispose();
     }

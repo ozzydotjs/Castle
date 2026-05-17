@@ -6,7 +6,7 @@
     <base href="/" />
 
     <link rel="icon" type="image/png" href="skull-logo.png" />
-    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="css/app.css" />
     <link href="Castle.styles.css" rel="stylesheet" />
 
     <style>
@@ -136,6 +136,7 @@
                 root.style.setProperty('--favorite-color', '#FF0000');
                 root.style.setProperty('--player-bar-bg', '#141414');
                 root.style.setProperty('--sidebar-bg', '#0A0A0A');
+                root.classList.remove('force-bw-bars');
             }
         })();
     </script>
@@ -320,7 +321,6 @@
                 var accentHover = hslToHex(hue, saturation * 100, 65 * brightness);
                 var accentSubtle = hslToHex(hue, saturation * 30, 10 * brightness);
                 var accentActive = hslToHex(hue, saturation * 60, 70 * brightness);
-                var progressFill = hslToHex(hue, saturation * 100, 50 * brightness);
                 var favoriteColor = hslToHex((hue + 30) % 360, saturation * 100, 50 * brightness);
 
                 var root = document.documentElement;
@@ -329,8 +329,13 @@
                 root.style.setProperty('--accent-hover', accentHover);
                 root.style.setProperty('--accent-subtle', accentSubtle);
                 root.style.setProperty('--accent-active', accentActive);
-                root.style.setProperty('--progress-fill', progressFill);
                 root.style.setProperty('--favorite-color', favoriteColor);
+
+                // Only animate progress-fill if NOT in force-bw-bars mode
+                if (!root.classList.contains('force-bw-bars')) {
+                    var progressFill = hslToHex(hue, saturation * 100, 50 * brightness);
+                    root.style.setProperty('--progress-fill', progressFill);
+                }
             }, speed);
         };
 
@@ -375,6 +380,13 @@
             root.style.setProperty('--sidebar-bg', get('sidebarBg', 'SidebarBg', '#0A0A0A'));
 
             root.setAttribute('data-theme', themeName);
+
+            var isRgb = get('isRgb', 'IsRgb', false);
+            if (isRgb) {
+                root.classList.add('force-bw-bars');
+            } else {
+                root.classList.remove('force-bw-bars');
+            }
 
             var oldWallpaper = document.querySelector('.theme-wallpaper');
 

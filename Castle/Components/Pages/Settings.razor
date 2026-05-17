@@ -1,0 +1,235 @@
+@page "/settings"
+@using Castle.Services
+@using Castle.Core.Interfaces
+@inject SettingsService SettingsService
+@inject ILibraryScanner Scanner
+@inject ISongRepository Repository
+@inject NavigationManager Navigation
+
+<style>
+    .dialog-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    .dialog {
+        background: #1A1A1A;
+        border: 1px solid #2A2A2A;
+        border-radius: 14px;
+        padding: 24px;
+        max-width: 420px;
+        width: 90%;
+    }
+
+        .dialog h4 {
+            margin: 0 0 12px 0;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .dialog p {
+            color: #999;
+            font-size: 13px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+    .dialog-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .dialog-btn {
+        padding: 8px 16px;
+        border-radius: 7px;
+        border: 1px solid #2A2A2A;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+        .dialog-btn.cancel {
+            background: #141414;
+            color: #999;
+        }
+
+        .dialog-btn.confirm {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+</style>
+
+<h3><LiSettings Size="20" Stroke="#BBBBBB" /> SETTINGS</h3>
+
+@* ========== STREAMING ========== *@
+<div class="settings-section">
+    <h4><LiRadio Size="16" Stroke="#BBBBBB" /> Streaming</h4>
+    <div class="setting-row">
+        <div class="setting-info">
+            <span class="setting-label">Live Streaming</span>
+            <span class="setting-desc">Stream audio directly without downloading. Requires app restart to take effect.</span>
+        </div>
+        <label class="toggle-switch">
+            <input type="checkbox" checked="@_streamingEnabled" @onchange="ToggleStreaming" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+</div>
+
+@* ========== LIBRARY MANAGEMENT ========== *@
+<div class="settings-section">
+    <h4><LiFolderSync Size="16" Stroke="#BBBBBB" /> Library</h4>
+    
+    <div class="setting-row">
+        <div class="setting-info">
+            <span class="setting-label">Music Folder</span>
+            <span class="setting-desc">@(SettingsService.MusicFolderPath ?? "Not set")</span>
+        </div>
+        <button @onclick="PickFolder" class="settings-btn">
+            <LiFolderOpen Size="14" Stroke="#FFFFFF" /> Browse
+        </button>
+    </div>
+
+    <div class="setting-row">
+        <div class="setting-info">
+            <span class="setting-label">Scan Folder</span>
+            <span class="setting-desc">Import all music from your selected folder</span>
+        </div>
+        <button @onclick="ScanLibrary" disabled="@_isScanning" class="settings-btn">
+            <LiFolderSync Size="14" Stroke="#FFFFFF" /> @(_isScanning ? "Scanning..." : "Scan")
+        </button>
+    </div>
+
+    @if (_scanProgress > 0 && _scanProgress < 100)
+    {
+        <div class="progress-wrap">
+            <div class="progress-fill" style="width: @(_scanProgress)%;"></div>
+        </div>
+    }
+
+    <div class="setting-row" style="border-bottom: none;">
+        <div class="setting-info">
+            <span class="setting-label" style="color: #ff4444;">Clear Library</span>
+            <span class="setting-desc">Remove all songs from your library. This cannot be undone.</span>
+        </div>
+        <button @onclick="ShowClearConfirm" class="settings-btn danger-btn">
+            <LiTrash2 Size="14" Stroke="#ff4444" /> Clear All
+        </button>
+    </div>
+</div>
+
+@* DIALOGS — outside all containers so they render as fixed overlays *@
+@if (_showStreamingDialog)
+{
+    <div class="dialog-overlay" @onclick="CancelStreaming">
+        <div class="dialog" @onclick:stopPropagation="true">
+            <h4>Enable Live Streaming?</h4>
+            <p>Enabling streaming will double Castle's memory usage (~300MB). This requires an app restart (F5) to take effect.</p>
+            <div class="dialog-actions">
+                <button @onclick="CancelStreaming" class="dialog-btn cancel">Cancel</button>
+                <button @onclick="ConfirmStreaming" class="dialog-btn confirm">Enable & Restart Later</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showClearDialog)
+{
+    <div class="dialog-overlay" @onclick="CancelClear">
+        <div class="dialog" @onclick:stopPropagation="true">
+            <h4>Clear Library?</h4>
+            <p>This will remove all @_songCount songs from your library. This action cannot be undone.</p>
+            <div class="dialog-actions">
+                <button @onclick="CancelClear" class="dialog-btn cancel">Cancel</button>
+                <button @onclick="ConfirmClear" class="dialog-btn confirm">Yes, Clear Everything</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _streamingEnabled;
+    private bool _isScanning;
+    private int _scanProgress;
+    private bool _showClearDialog;
+    private bool _showStreamingDialog;
+    private int _songCount;
+
+    protected override void OnInitialized()
+    {
+        _streamingEnabled = Preferences.Get("streaming_enabled", false);
+        _songCount = Repository.GetAll().Count;
+    }
+
+    void ToggleStreaming(ChangeEventArgs e)
+    {
+        var enabled = (bool)(e.Value ?? false);
+        if (enabled)
+        {
+            _showStreamingDialog = true;
+            _streamingEnabled = false;
+        }
+        else
+        {
+            _streamingEnabled = false;
+            Preferences.Set("streaming_enabled", false);
+        }
+        StateHasChanged();
+    }
+
+    void ConfirmStreaming()
+    {
+        _streamingEnabled = true;
+        Preferences.Set("streaming_enabled", _streamingEnabled);
+        _showStreamingDialog = false;
+        StateHasChanged();
+    }
+
+    void CancelStreaming()
+    {
+        _showStreamingDialog = false;
+        _streamingEnabled = false;
+        StateHasChanged();
+    }
+
+    async Task PickFolder()
+    {
+        var path = await SettingsService.PickMusicFolderAsync();
+        if (path != null) StateHasChanged();
+    }
+
+    async Task ScanLibrary()
+    {
+        _isScanning = true;
+        _scanProgress = 0;
+        var progress = new Progress<int>(p => { _scanProgress = p; StateHasChanged(); });
+        string path = SettingsService.MusicFolderPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        var songs = await Scanner.ScanFolderAsync(path, progress);
+        Repository.DeleteAll();
+        Repository.InsertBatch(songs);
+        SettingsService.MusicFolderPath = path;
+        SettingsService.HasScanned = true;
+        _songCount = songs.Count;
+        _isScanning = false;
+        StateHasChanged();
+    }
+
+    void ShowClearConfirm() { _showClearDialog = true; }
+    void CancelClear() { _showClearDialog = false; }
+
+    void ConfirmClear()
+    {
+        Repository.DeleteAll();
+        SettingsService.HasScanned = false;
+        _songCount = 0;
+        _showClearDialog = false;
+        StateHasChanged();
+    }
+}

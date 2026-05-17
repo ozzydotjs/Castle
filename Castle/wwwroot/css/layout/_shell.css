@@ -1,0 +1,23 @@
+/* ========== MAIN LAYOUT ========== */
+
+.page {
+    display: flex;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+main {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--bg-primary);
+    min-width: 0;
+}
+
+.content {
+    padding: var(--ui-content-y) var(--ui-content-x);
+    max-width: min(1500px, 100%);
+    width: 100%;
+    animation: pageEnter var(--anim-normal) var(--anim-ease);
+    padding-bottom: 110px !important;
+}

@@ -1,0 +1,36 @@
+/* ========== AERO GLASS THEME ========== */
+
+[data-theme="Aero"] .suggested-card,
+[data-theme="Aero"] .playlist-card,
+[data-theme="Aero"] .dash-card,
+[data-theme="Aero"] .dash-section {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 20px color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+    [data-theme="Aero"] .suggested-card::before,
+    [data-theme="Aero"] .playlist-card::before,
+    [data-theme="Aero"] .dash-card::before,
+    [data-theme="Aero"] .dash-section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 40%;
+        background: linear-gradient(to bottom, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 50%, transparent 100%);
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    [data-theme="Aero"] .suggested-card:hover,
+    [data-theme="Aero"] .playlist-card:hover,
+    [data-theme="Aero"] .dash-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 28px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1), 0 0 32px color-mix(in srgb, var(--accent) 15%, transparent);
+        border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+    }

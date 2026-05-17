@@ -1,0 +1,7 @@
+/* ========== RGB ANIMATED BAR ========== */
+
+.rgb-bar {
+    background: linear-gradient(90deg, red, yellow, lime, cyan, blue, magenta, red);
+    animation: rgb-shift 2s linear infinite;
+    background-size: 200% 100%;
+}

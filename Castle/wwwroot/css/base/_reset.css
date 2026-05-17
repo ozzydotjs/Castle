@@ -1,0 +1,76 @@
+/* ========== RESET ========== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    color: var(--text-primary);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    height: 100%;
+    font-size: 14px;
+    overflow: hidden;
+    position: relative;
+}
+
+#app {
+    position: relative !important;
+    z-index: 1 !important;
+    min-height: 100vh;
+    background: transparent !important;
+}
+
+::-webkit-scrollbar {
+    width: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--border) 60%, transparent);
+    border-radius: 3px;
+    transition: background var(--anim-normal) var(--anim-ease);
+}
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--accent);
+    }
+
+h2 {
+    color: var(--text-primary);
+    font-size: var(--ui-font-lg);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+h3 {
+    color: var(--text-secondary);
+    font-size: var(--ui-font-xs);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 24px 0 12px 0;
+    font-weight: 600;
+}
+
+.theme-wallpaper {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    opacity: 1 !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+}

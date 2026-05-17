@@ -1,0 +1,362 @@
+@page "/streaming"
+@using Castle.Core.Services
+@using Castle.Core.Interfaces
+@using Castle.Core.Models
+@implements IDisposable
+@inject SearchService SearchService
+@inject RecommendationService RecommendationService
+@inject StreamSnipper StreamSnipper
+@inject IAudioEngine AudioEngine
+@inject DownloadQueueService DownloadQueue
+@inject QueueService QueueService
+@inject PlaybackService Playback
+
+<div class="streaming-page">
+    @* ========== HEADER ========== *@
+    <div class="streaming-hero">
+        <h3><LiRadio Size="20" Stroke="#ff4444" /> Live Streaming</h3>
+        
+        <div class="streaming-search">
+            <input @bind="_query" @bind:event="oninput"
+                   placeholder="Search YouTube Music..."
+                   class="streaming-search-input"
+                   @onkeydown="OnSearchKeyDown" />
+            <button @onclick="DoSearch" disabled="@_isSearching" class="streaming-search-btn">
+                <LiSearch Size="16" Stroke="#fff" />
+            </button>
+        </div>
+
+        @if (_showSuggestions && _suggestions.Count > 0)
+        {
+            <div class="streaming-suggestions">
+                @foreach (var suggestion in _suggestions)
+                {
+                    <div class="streaming-suggestion-item" @onclick="() => SelectSuggestion(suggestion)">
+                        <LiSearch Size="14" Stroke="#888" /> @suggestion
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_status))
+    {
+        <p class="status-text">@_status</p>
+    }
+
+    @* ========== SEARCH RESULTS ========== *@
+    @if (_hasSearched)
+    {
+        <section class="streaming-section">
+            <h4>Results for "@_lastQuery"</h4>
+            @if (_isSearching)
+            {
+                <div class="streaming-loading">
+                    @for (int i = 0; i < 6; i++)
+                    {
+                        <div class="skeleton-card"></div>
+                    }
+                </div>
+            }
+            else if (_searchResults.Count == 0)
+            {
+                <p class="status-text">No results found.</p>
+            }
+            else
+            {
+                <div class="streaming-grid">
+                    @foreach (var result in _searchResults)
+                    {
+                        <div class="streaming-card">
+                            @if (!string.IsNullOrEmpty(result.ThumbnailUrl))
+                            {
+                                <img src="@result.ThumbnailUrl" class="streaming-thumb" />
+                            }
+                            <div class="streaming-card-info">
+                                <span class="streaming-title">@result.Title</span>
+                                <span class="streaming-author">@result.Author — @result.Duration</span>
+                            </div>
+                            <div class="streaming-card-actions">
+                                <div class="streaming-card-actions-row">
+                                    <button @onclick="() => StreamResult(result)" class="stream-btn" title="Stream Now">
+                                        <LiPlay Size="14" Stroke="#fff" /> Stream
+                                    </button>
+                                    <button @onclick="() => AddToQueueResult(result)" class="stream-action-btn" title="Add to Queue">
+                                        <LiListPlus Size="14" Stroke="var(--text-secondary)" />
+                                    </button>
+                                    <button @onclick="() => PlayNextResult(result)" class="stream-action-btn" title="Play Next">
+                                        <LiSkipForward Size="14" Stroke="var(--text-secondary)" />
+                                    </button>
+                                </div>
+                                <button @onclick="() => DownloadResult(result)" class="stream-download-btn" title="Download">
+                                    <LiDownload Size="12" Stroke="var(--text-secondary)" /> Download
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+    @* ========== RECOMMENDED FOR YOU ========== *@
+    @if (!_hasSearched)
+    {
+        <section class="streaming-section">
+            <h4>
+                <LiSparkles Size="16" Stroke="var(--text-primary)" /> Recommended For You
+                <button @onclick="RefreshRecommendations" class="plain-refresh-btn" title="Refresh">
+                    <LiRefreshCw Size="14" Stroke="var(--text-secondary)" />
+                </button>
+            </h4>
+            @if (_isLoadingRecs)
+            {
+                <div class="streaming-loading">
+                    @for (int i = 0; i < 6; i++)
+                    {
+                        <div class="skeleton-card"></div>
+                    }
+                </div>
+            }
+            else if (_recommendations.Count > 0)
+            {
+                <div class="streaming-grid">
+                    @foreach (var rec in _recommendations)
+                    {
+                        <div class="streaming-card">
+                            @if (!string.IsNullOrEmpty(rec.ThumbnailUrl))
+                            {
+                                <img src="@rec.ThumbnailUrl" class="streaming-thumb" />
+                            }
+                            <div class="streaming-card-info">
+                                <span class="streaming-title">@rec.Title</span>
+                                <span class="streaming-author">@rec.Author</span>
+                                <span class="streaming-reason">@rec.Reason</span>
+                            </div>
+                            <div class="streaming-card-actions">
+                                <div class="streaming-card-actions-row">
+                                    <button @onclick="() => StreamRec(rec)" class="stream-btn" title="Stream Now">
+                                        <LiPlay Size="14" Stroke="#fff" /> Stream
+                                    </button>
+                                    <button @onclick="() => AddToQueueRec(rec)" class="stream-action-btn" title="Add to Queue">
+                                        <LiListPlus Size="14" Stroke="var(--text-secondary)" />
+                                    </button>
+                                    <button @onclick="() => PlayNextRec(rec)" class="stream-action-btn" title="Play Next">
+                                        <LiSkipForward Size="14" Stroke="var(--text-secondary)" />
+                                    </button>
+                                </div>
+                                <button @onclick="() => DownloadRec(rec)" class="stream-download-btn" title="Download">
+                                    <LiDownload Size="12" Stroke="var(--text-secondary)" /> Download
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="status-text">Add music to your library for recommendations.</p>
+            }
+        </section>
+
+        @* ========== TRENDING ========== *@
+        <section class="streaming-section">
+            <h4><LiTrendingUp Size="16" Stroke="var(--text-primary)" /> Trending</h4>
+            @if (_isLoadingTrending)
+            {
+                <div class="streaming-loading">
+                    @for (int i = 0; i < 4; i++)
+                    {
+                        <div class="skeleton-card"></div>
+                    }
+                </div>
+            }
+            else if (_trending.Count > 0)
+            {
+                <div class="streaming-list">
+                    @foreach (var result in _trending)
+                    {
+                        <div class="streaming-list-item">
+                            @if (!string.IsNullOrEmpty(result.ThumbnailUrl))
+                            {
+                                <img src="@result.ThumbnailUrl" class="streaming-thumb-sm" />
+                            }
+                            <div class="streaming-list-info">
+                                <span class="streaming-title">@result.Title</span>
+                                <span class="streaming-author">@result.Author — @result.Duration</span>
+                            </div>
+                            <div class="streaming-list-actions">
+                                <button @onclick="() => StreamResult(result)" class="stream-btn-sm" title="Stream">
+                                    <LiPlay Size="12" Stroke="#fff" />
+                                </button>
+                                <button @onclick="() => AddToQueueResult(result)" class="stream-action-btn-sm" title="Add to Queue">
+                                    <LiListPlus Size="12" Stroke="var(--text-secondary)" />
+                                </button>
+                                <button @onclick="() => PlayNextResult(result)" class="stream-action-btn-sm" title="Play Next">
+                                    <LiSkipForward Size="12" Stroke="var(--text-secondary)" />
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="status-text">Couldn't load trending.</p>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private string _query = "";
+    private string _lastQuery = "";
+    private bool _isSearching;
+    private bool _hasSearched;
+    private string _status = "";
+    private List<SearchResult> _searchResults = new();
+    private List<RecommendedTrack> _recommendations = new();
+    private List<SearchResult> _trending = new();
+    private List<string> _suggestions = new();
+    private bool _showSuggestions;
+    private bool _isLoadingRecs = true;
+    private bool _isLoadingTrending = true;
+    private CancellationTokenSource? _suggestCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFeedAsync();
+    }
+
+    async Task LoadFeedAsync()
+    {
+        _ = LoadRecommendationsAsync();
+        _ = LoadTrendingAsync();
+    }
+
+    async Task LoadRecommendationsAsync()
+    {
+        try { _recommendations = await RecommendationService.GetRecommendationsAsync(12); } catch { }
+        _isLoadingRecs = false;
+        StateHasChanged();
+    }
+
+    async Task LoadTrendingAsync()
+    {
+        try { _trending = await SearchService.SearchAsync("music", 10); } catch { }
+        _isLoadingTrending = false;
+        StateHasChanged();
+    }
+
+    async void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") { await DoSearch(); return; }
+        if (_query.Length < 2) { _showSuggestions = false; _suggestions.Clear(); return; }
+        _suggestCts?.Cancel();
+        _suggestCts = new CancellationTokenSource();
+        var token = _suggestCts.Token;
+        await Task.Delay(300);
+        if (token.IsCancellationRequested) return;
+        try { _suggestions = await SearchService.GetSuggestionsAsync(_query); _showSuggestions = _suggestions.Count > 0; StateHasChanged(); } catch { }
+    }
+
+    void SelectSuggestion(string suggestion) { _query = suggestion; _showSuggestions = false; _ = DoSearch(); }
+
+    async Task DoSearch()
+    {
+        if (string.IsNullOrWhiteSpace(_query)) return;
+        _hasSearched = true; _showSuggestions = false; _lastQuery = _query; _isSearching = true; _status = "";
+        StateHasChanged();
+        try { _searchResults = await SearchService.SearchAsync(_query, 15); } catch { _status = "Search failed."; }
+        _isSearching = false;
+        StateHasChanged();
+    }
+    async Task RefreshRecommendations()
+    {
+        _isLoadingRecs = true;
+        _recommendations = new();
+        StateHasChanged();
+        await Task.Delay(300);
+        try { _recommendations = await RecommendationService.GetRecommendationsAsync(12); } catch { }
+        _isLoadingRecs = false;
+        StateHasChanged();
+    }
+
+    // ===== STREAM =====
+    async void StreamResult(SearchResult result)
+    {
+        try { _status = $"Streaming: {result.Title}..."; StateHasChanged(); await StreamSnipper.PlayStreamAsync(result.VideoId, result.Title, result.Author, result.ThumbnailUrl, AudioEngine, 0); }
+        catch (Exception ex) { _status = $"Stream failed: {ex.Message}"; }
+    }
+
+    async void StreamRec(RecommendedTrack rec)
+    {
+        try { _status = $"Streaming: {rec.Title}..."; StateHasChanged(); await StreamSnipper.PlayStreamAsync(rec.VideoId, rec.Title, rec.Author, rec.ThumbnailUrl, AudioEngine, 0); }
+        catch (Exception ex) { _status = $"Stream failed: {ex.Message}"; }
+    }
+
+    // ===== ADD TO QUEUE =====
+    async void AddToQueueResult(SearchResult result)
+    {
+        _status = $"Queueing: {result.Title}...";
+        StateHasChanged();
+        var song = await StreamSnipper.DownloadToTempAsync(result.VideoId, result.Title, result.Author, result.ThumbnailUrl);
+        if (song != null) { QueueService.Add(song); _status = $"Added to queue: {result.Title}"; }
+        else { _status = $"Failed to queue: {result.Title}"; }
+        StateHasChanged();
+    }
+
+    async void AddToQueueRec(RecommendedTrack rec)
+    {
+        _status = $"Queueing: {rec.Title}...";
+        StateHasChanged();
+        var song = await StreamSnipper.DownloadToTempAsync(rec.VideoId, rec.Title, rec.Author, rec.ThumbnailUrl);
+        if (song != null) { QueueService.Add(song); _status = $"Added to queue: {rec.Title}"; }
+        else { _status = $"Failed to queue: {rec.Title}"; }
+        StateHasChanged();
+    }
+
+    // ===== PLAY NEXT =====
+    async void PlayNextResult(SearchResult result)
+    {
+        _status = $"Preparing: {result.Title}...";
+        StateHasChanged();
+        var song = await StreamSnipper.DownloadToTempAsync(result.VideoId, result.Title, result.Author, result.ThumbnailUrl);
+        if (song != null) { QueueService.PlayNext(song); _status = $"Playing next: {result.Title}"; }
+        else { _status = $"Failed: {result.Title}"; }
+        StateHasChanged();
+    }
+
+    async void PlayNextRec(RecommendedTrack rec)
+    {
+        _status = $"Preparing: {rec.Title}...";
+        StateHasChanged();
+        var song = await StreamSnipper.DownloadToTempAsync(rec.VideoId, rec.Title, rec.Author, rec.ThumbnailUrl);
+        if (song != null) { QueueService.PlayNext(song); _status = $"Playing next: {rec.Title}"; }
+        else { _status = $"Failed: {rec.Title}"; }
+        StateHasChanged();
+    }
+
+    // ===== DOWNLOAD =====
+    void DownloadResult(SearchResult result)
+    {
+        DownloadQueue.AddToQueue($"https://youtube.com/watch?v={result.VideoId}", result.Title, result.Author);
+        _status = $"Downloading: {result.Title}";
+    }
+
+    void DownloadRec(RecommendedTrack rec)
+    {
+        DownloadQueue.AddToQueue($"https://youtube.com/watch?v={rec.VideoId}", rec.Title, rec.Author);
+        _status = $"Downloading: {rec.Title}";
+    }
+
+    public void Dispose()
+    {
+        _searchResults = null!;
+        _recommendations = null!;
+        _trending = null!;
+        _suggestions = null!;
+        _suggestCts?.Cancel();
+        _suggestCts = null;
+    }
+}

@@ -1,0 +1,99 @@
+/* ========== AYRANIC THEME OVERRIDES ========== */
+
+/* Transparent main */
+[data-theme="Ayranic"] main {
+    background: transparent;
+}
+
+/* Glass cards */
+[data-theme="Ayranic"] .suggested-card,
+[data-theme="Ayranic"] .playlist-card,
+[data-theme="Ayranic"] .dash-card,
+[data-theme="Ayranic"] .dash-section {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(160,210,255,0.06), 0 0 20px rgba(77,215,255,0.05);
+    border: 1px solid rgba(160,210,255,0.12);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+    [data-theme="Ayranic"] .suggested-card::before,
+    [data-theme="Ayranic"] .playlist-card::before,
+    [data-theme="Ayranic"] .dash-card::before,
+    [data-theme="Ayranic"] .dash-section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 40%;
+        background: linear-gradient(to bottom, rgba(160,210,255,0.04) 0%, rgba(160,210,255,0.01) 50%, transparent 100%);
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    [data-theme="Ayranic"] .suggested-card:hover,
+    [data-theme="Ayranic"] .playlist-card:hover,
+    [data-theme="Ayranic"] .dash-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(160,210,255,0.1), 0 0 32px rgba(77,215,255,0.12);
+        border-color: rgba(77,215,255,0.25);
+    }
+
+/* Active song */
+[data-theme="Ayranic"] .song-list li.active {
+    box-shadow: inset 3px 0 0 #4DD7FF;
+    background: rgba(77, 215, 255, 0.05);
+}
+
+[data-theme="Ayranic"] .song-list li:hover {
+    background: rgba(77, 215, 255, 0.03);
+}
+
+/* Active nav */
+[data-theme="Ayranic"] .nav-item.active {
+    box-shadow: 0 0 16px rgba(77, 215, 255, 0.12);
+    border-left-color: #4DD7FF;
+}
+
+/* Filter buttons */
+[data-theme="Ayranic"] button.filter-active {
+    background: rgba(77, 215, 255, 0.1);
+    border-color: rgba(77, 215, 255, 0.25);
+    color: #4DD7FF;
+}
+
+/* Selection */
+[data-theme="Ayranic"] ::selection {
+    background: rgba(77, 215, 255, 0.2);
+    color: #F4F7FB;
+}
+
+/* Seek/volume */
+[data-theme="Ayranic"] input[type="range"] {
+    accent-color: #57F2C3;
+}
+
+[data-theme="Ayranic"] .progress-fill {
+    background: #57F2C3;
+}
+
+/* Favorite */
+[data-theme="Ayranic"] .fav-star {
+    color: #F7D77A;
+}
+
+/* Glass floating panels */
+[data-theme="Ayranic"] .np-queue-floating,
+[data-theme="Ayranic"] .context-menu {
+    background: rgba(8, 18, 36, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(160, 210, 255, 0.12);
+}
+
+/* Theme card selected glow */
+[data-theme="Ayranic"] .theme-card.selected .theme-preview {
+    box-shadow: 0 0 0 2px #4DD7FF, 0 0 20px rgba(77, 215, 255, 0.2);
+}

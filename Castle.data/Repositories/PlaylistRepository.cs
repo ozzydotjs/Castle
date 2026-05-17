@@ -127,4 +127,22 @@ public class PlaylistRepository : IPlaylistRepository
 
         Update(playlist);
     }
+
+    public void RenamePlaylist(string playlistId, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(playlistId) || string.IsNullOrWhiteSpace(newName))
+        {
+            return;
+        }
+
+        var playlist = GetById(playlistId);
+
+        if (playlist == null)
+        {
+            return;
+        }
+
+        playlist.Name = newName.Trim();
+        Update(playlist);
+    }
 }

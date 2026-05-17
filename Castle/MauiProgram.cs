@@ -46,6 +46,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<RecommendationService>();
         builder.Services.AddSingleton<DiscoverService>();
         builder.Services.AddSingleton<PlaylistImportService>();
+        builder.Services.AddSingleton(sp => new StreamSnipper(sp.GetRequiredService<PlaybackService>(), sp.GetRequiredService<QueueService>()));
         builder.Services.AddLucideIcons();
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddSingleton<ThemeService>();
@@ -60,27 +61,6 @@ public static class MauiProgram
         var player = app.Services.GetRequiredService<PlaybackService>();
         var queue = app.Services.GetRequiredService<QueueService>();
         KeyboardHandler.Initialize(player, queue);
-
-        Task.Run(async () =>
-        {
-            try
-            {
-                var discover = app.Services.GetRequiredService<DiscoverService>();
-                await discover.GetDailyDiscoverAsync(6);
-                await discover.GetPopularPlaylistsAsync();
-                System.Diagnostics.Debug.WriteLine("[Startup] Discover cache preloaded");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[Startup] Discover preload failed: {ex.Message}");
-            }
-        });
-
-        Task.Run(() =>
-        {
-            var repo = app.Services.GetRequiredService<ISongRepository>();
-            repo.GetAll();
-        });
 
         return app;
     }

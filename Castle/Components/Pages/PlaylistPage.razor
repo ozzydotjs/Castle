@@ -6,6 +6,7 @@
 @inject ISongRepository SongRepo
 @inject PlaybackService Player
 @inject QueueService QueueService
+@inject PlaylistService PlaylistService
 @inject NavigationManager Navigation
 
 @if (_playlist == null)
@@ -23,15 +24,55 @@ else
             <LiArrowLeft Size="18" Stroke="#BBBBBB" />
         </button>
 
-        <h2>@_playlist.Name</h2>
+        @* Playlist Cover *@
+        <div class="playlist-cover-area">
+            @if (!string.IsNullOrEmpty(_coverUrl))
+            {
+                <img src="@_coverUrl" class="playlist-cover-img" />
+            }
+            else
+            {
+                <div class="playlist-cover-placeholder">
+                    <LiListMusic Size="48" Stroke="#555" />
+                </div>
+            }
+            <button @onclick="PickCustomCover" class="playlist-cover-edit-btn" title="Change Cover">
+                <LiPencil Size="12" Stroke="#BBBBBB" />
+            </button>
+        </div>
+
+        @if (_isRenaming)
+        {
+            <input @bind="_renameText" class="playlist-rename-input"
+                   @onkeydown="OnRenameKeyDown"
+                   @onblur="SaveRename" />
+        }
+        else
+        {
+            <h2 @onclick="StartRename" class="playlist-title-editable" title="Click to rename">
+                @_playlist.Name
+                <LiPencil Size="12" Stroke="#888" class="rename-hint" />
+            </h2>
+        }
 
         <button @onclick="PlayAll" class="ctrl-btn" title="Play All" disabled="@(_songs.Count == 0)">
             <LiPlay Size="18" Stroke="#BBBBBB" />
         </button>
 
+        <button @onclick="ToggleAddSongs" class="ctrl-btn" title="Add Songs">
+            <LiPlus Size="18" Stroke="#BBBBBB" />
+        </button>
+
         <button @onclick="ExportPlaylist" class="ctrl-btn" title="Export as .m3u">
             <LiDownload Size="18" Stroke="#BBBBBB" />
         </button>
+
+        @if (_multiSelect.Count > 0)
+        {
+            <button @onclick="RemoveSelected" class="ctrl-btn danger" title="Remove Selected">
+                <LiTrash2 Size="18" Stroke="#ff4444" /> (@_multiSelect.Count)
+            </button>
+        }
     </div>
 
     @if (!string.IsNullOrEmpty(_statusMessage))
@@ -39,12 +80,37 @@ else
         <p class="status-text">@_statusMessage</p>
     }
 
+    @* Quick-add song picker *@
+    @if (_showAddSongs)
+    {
+        <div class="quick-add-panel">
+            <input @bind="_addSearchQuery" @bind:event="oninput"
+                   placeholder="Search library..." class="quick-add-input" />
+            <div class="quick-add-list">
+                @foreach (var song in _librarySongs
+                    .Where(s => !_songs.Any(ps => ps.Id == s.Id))
+                    .Where(s => string.IsNullOrEmpty(_addSearchQuery) ||
+                        s.Title.Contains(_addSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                        s.Artist.Contains(_addSearchQuery, StringComparison.OrdinalIgnoreCase))
+                    .Take(20))
+                {
+                    <div class="quick-add-item" @onclick="() => AddSongToPlaylist(song)">
+                        <LiPlus Size="14" Stroke="#4caf50" />
+                        <span>@song.Title</span>
+                        <span class="quick-add-artist">@song.Artist</span>
+                    </div>
+                }
+            </div>
+            <button @onclick="ToggleAddSongs" class="quick-add-close">Done</button>
+        </div>
+    }
+
     @if (_songs.Count == 0)
     {
         <div class="empty-state">
             <LiListMusic Size="48" Stroke="#555" />
             <h3>This playlist is empty</h3>
-            <p class="status-text">Add songs from the Library by right-clicking them.</p>
+            <p class="status-text">Click the + button to add songs.</p>
         </div>
     }
     else
@@ -54,9 +120,16 @@ else
         <ul class="song-list">
             @foreach (var song in _songs)
             {
-                <li @onclick="() => PlaySong(song)"
+                <li @onclick="(e) => OnSongClick(e, song)"
                     @oncontextmenu="(e) => OpenContextMenu(e, song)"
-                    class="@(Player.Queue.CurrentSong?.FilePath == song.FilePath ? "active" : "")">
+                    class="@(GetActiveClass(song)) @(_multiSelect.Contains(song.Id) ? "multi-selected" : "")">
+                    
+                    <input type="checkbox"
+                           checked="@_multiSelect.Contains(song.Id)"
+                           @onchange="(e) => ToggleSelect(song.Id, (bool)e.Value!)"
+                           @onclick:stopPropagation="true"
+                           class="multi-checkbox" />
+
                     @if (!string.IsNullOrEmpty(song.CoverArtPath))
                     {
                         <img src="@GetCoverUrl(song.CoverArtPath)" class="song-cover" />
@@ -88,13 +161,19 @@ else
 @if (_contextMenuVisible)
 {
     <div class="context-menu" style="left: @(_contextX)px; top: @(_contextY)px;" @key="_contextSong?.Id">
-        <div class="context-item" @onclick="() => { PlaySong(_contextSong!); CloseContextMenu(); }">▶ Play</div>
-        <div class="context-item" @onclick="() => { Player.PlayQueue(_songs, _songs.IndexOf(_contextSong!)); CloseContextMenu(); }">▶ Play Next</div>
+        <div class="context-item" @onclick="() => { PlaySong(_contextSong!); CloseContextMenu(); }">
+            <LiPlay Size="14" Stroke="#BBBBBB" /> Play
+        </div>
+        <div class="context-item" @onclick="() => { Player.PlayQueue(_songs, _songs.IndexOf(_contextSong!)); CloseContextMenu(); }">
+            <LiSkipForward Size="14" Stroke="#BBBBBB" /> Play from Here
+        </div>
         <div class="context-item" @onclick="() => { QueueService.Add(_contextSong!); if (!Player.IsPlaying) Player.PlaySong(_contextSong!); CloseContextMenu(); }">
-            ➕ Add to Queue
+            <LiListPlus Size="14" Stroke="#BBBBBB" /> Add to Queue
         </div>
         <div class="context-separator"></div>
-        <div class="context-item" @onclick="CloseContextMenu">Close</div>
+        <div class="context-item" @onclick="CloseContextMenu">
+            <LiX Size="14" Stroke="#BBBBBB" /> Close
+        </div>
     </div>
 
     <div class="context-overlay" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"></div>
@@ -106,15 +185,23 @@ else
 
     private Playlist? _playlist;
     private List<Song> _songs = new();
+    private List<Song> _librarySongs = new();
+    private HashSet<string> _multiSelect = new();
     private bool _contextMenuVisible;
     private double _contextX;
     private double _contextY;
     private Song? _contextSong;
     private string _statusMessage = "";
+    private bool _isRenaming;
+    private string _renameText = "";
+    private bool _showAddSongs;
+    private string _addSearchQuery = "";
+    private string _coverUrl = "";
 
     protected override void OnInitialized()
     {
         LoadPlaylist();
+        _librarySongs = SongRepo.GetAll();
         Player.Queue.QueueChanged += () => InvokeAsync(StateHasChanged);
     }
 
@@ -129,6 +216,25 @@ else
                 .Where(s => s != null)
                 .Cast<Song>()
                 .ToList();
+
+            _coverUrl = PlaylistService.GetPlaylistCoverUrl(Id);
+        }
+    }
+
+    private string GetActiveClass(Song song)
+    {
+        return Player.Queue.CurrentSong?.FilePath == song.FilePath ? "active" : "";
+    }
+
+    private void OnSongClick(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Song song)
+    {
+        if (e.CtrlKey || e.MetaKey)
+        {
+            ToggleSelect(song.Id, !_multiSelect.Contains(song.Id));
+        }
+        else
+        {
+            PlaySong(song);
         }
     }
 
@@ -145,19 +251,107 @@ else
         }
     }
 
+    private void ToggleSelect(string songId, bool selected)
+    {
+        if (selected) _multiSelect.Add(songId);
+        else _multiSelect.Remove(songId);
+    }
+
     private void RemoveSong(Song song)
     {
         PlaylistRepo.RemoveSong(Id, song.Id);
+        _multiSelect.Remove(song.Id);
         LoadPlaylist();
         StateHasChanged();
     }
 
+    private void RemoveSelected()
+    {
+        foreach (var songId in _multiSelect.ToList())
+        {
+            PlaylistRepo.RemoveSong(Id, songId);
+        }
+        _multiSelect.Clear();
+        LoadPlaylist();
+        StateHasChanged();
+    }
+
+    // ===== INLINE RENAME =====
+    private void StartRename()
+    {
+        _isRenaming = true;
+        _renameText = _playlist?.Name ?? "";
+    }
+
+    private async void OnRenameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveRename();
+        }
+        else if (e.Key == "Escape")
+        {
+            _isRenaming = false;
+        }
+    }
+
+    private async Task SaveRename()
+    {
+        _isRenaming = false;
+        if (!string.IsNullOrWhiteSpace(_renameText) && _playlist != null && _renameText != _playlist.Name)
+        {
+            PlaylistRepo.RenamePlaylist(_playlist.Id, _renameText.Trim());
+            LoadPlaylist();
+            StateHasChanged();
+        }
+    }
+
+    // ===== QUICK ADD =====
+    private void ToggleAddSongs()
+    {
+        _showAddSongs = !_showAddSongs;
+        _addSearchQuery = "";
+        if (_showAddSongs)
+        {
+            _librarySongs = SongRepo.GetAll();
+        }
+    }
+
+    private void AddSongToPlaylist(Song song)
+    {
+        PlaylistRepo.AddSong(Id, song.Id);
+        LoadPlaylist();
+        StateHasChanged();
+    }
+
+    // ===== CUSTOM COVER =====
+    private async Task PickCustomCover()
+    {
+        try
+        {
+            var fileResult = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Choose playlist cover image",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" } }
+                })
+            });
+
+            if (fileResult != null)
+            {
+                PlaylistService.SetCustomPlaylistCover(Id, fileResult.FullPath);
+                _coverUrl = PlaylistService.GetPlaylistCoverUrl(Id);
+                StateHasChanged();
+            }
+        }
+        catch { }
+    }
+
+    // ===== EXPORT =====
     private async Task ExportPlaylist()
     {
-        if (_playlist == null || _songs.Count == 0)
-        {
-            return;
-        }
+        if (_playlist == null || _songs.Count == 0) return;
 
         var m3u = new System.Text.StringBuilder();
         m3u.AppendLine("#EXTM3U");
@@ -174,25 +368,23 @@ else
             "Castle",
             "Playlists"
         );
-
         Directory.CreateDirectory(exportsFolder);
 
-        var safePlaylistName = SanitizeFileName(_playlist.Name);
-        var filePath = GetUniqueFilePath(exportsFolder, safePlaylistName, ".m3u");
-
+        var safeName = SanitizeFileName(_playlist.Name);
+        var filePath = GetUniqueFilePath(exportsFolder, safeName, ".m3u");
         await File.WriteAllTextAsync(filePath, m3u.ToString());
 
         _statusMessage = $"Exported to Documents/Castle/Playlists/{Path.GetFileName(filePath)}";
         StateHasChanged();
     }
 
+    // ===== CONTEXT MENU =====
     private void OpenContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Song song)
     {
         _contextSong = song;
         _contextX = e.ClientX;
         _contextY = e.ClientY;
         _contextMenuVisible = true;
-
         StateHasChanged();
     }
 
@@ -202,73 +394,38 @@ else
         _contextSong = null;
     }
 
-    private void GoBack()
-    {
-        Navigation.NavigateTo("/");
-    }
+    private void GoBack() => Navigation.NavigateTo("/");
 
-    private string GetCoverUrl(string? path)
-{
-    return CoverArtService.GetCoverUrl(path);
-}
+    private string GetCoverUrl(string? path) => CoverArtService.GetCoverUrl(path);
 
     private string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalHours >= 1)
-        {
             return string.Format("{0}:{1:D2}:{2:D2}", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
-        }
-
         return string.Format("{0}:{1:D2}", duration.Minutes, duration.Seconds);
     }
 
     private static string SanitizeFileName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return "Untitled Playlist";
-        }
-
+        if (string.IsNullOrWhiteSpace(name)) return "Untitled Playlist";
         var invalidChars = Path.GetInvalidFileNameChars();
         var sanitized = new string(name.Select(c => invalidChars.Contains(c) ? '_' : c).ToArray());
-
         sanitized = sanitized.Trim('.', ' ');
-
-        if (string.IsNullOrWhiteSpace(sanitized))
-        {
-            sanitized = "Untitled Playlist";
-        }
-
+        if (string.IsNullOrWhiteSpace(sanitized)) sanitized = "Untitled Playlist";
         return sanitized.Length > 100 ? sanitized[..100].Trim() : sanitized;
     }
 
     private static string GetUniqueFilePath(string folder, string baseName, string extension)
     {
         Directory.CreateDirectory(folder);
-
-        if (!extension.StartsWith('.'))
-        {
-            extension = "." + extension;
-        }
-
+        if (!extension.StartsWith('.')) extension = "." + extension;
         var path = Path.Combine(folder, $"{baseName}{extension}");
-
-        if (!File.Exists(path))
-        {
-            return path;
-        }
-
+        if (!File.Exists(path)) return path;
         var counter = 1;
-
         while (true)
         {
             var candidate = Path.Combine(folder, $"{baseName} ({counter}){extension}");
-
-            if (!File.Exists(candidate))
-            {
-                return candidate;
-            }
-
+            if (!File.Exists(candidate)) return candidate;
             counter++;
         }
     }

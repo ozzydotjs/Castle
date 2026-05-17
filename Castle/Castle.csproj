@@ -45,8 +45,7 @@
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#1A1D26" />
-
+		<MauiIcon Include="Resources\AppIcon\castle_icon.png" />
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#1A1D26" BaseSize="128,128" />
 
@@ -99,6 +98,10 @@
 		<None Update="yt-dlp.exe" Condition="Exists('yt-dlp.exe')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="wwwroot\tokens\" />
 	</ItemGroup>
 
 </Project>

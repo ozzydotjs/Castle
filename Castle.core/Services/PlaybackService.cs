@@ -51,12 +51,17 @@ public class PlaybackService
 
     public void PlaySong(Song song)
     {
-        var currentQueue = _queue.GetAll();
-        var index = FindSongIndex(currentQueue, song);
+        _queue.Repeat = RepeatMode.Off;
+
+        // Check if song is already in the upcoming queue
+        var upcomingSongs = _queue.GetAll();
+        var index = upcomingSongs.FindIndex(s =>
+            s.Id == song.Id ||
+            string.Equals(s.FilePath, song.FilePath, StringComparison.OrdinalIgnoreCase));
 
         if (index >= 0)
         {
-            var selected = _queue.JumpTo(index);
+            var selected = _queue.SkipTo(index);
             if (selected != null)
             {
                 PlaySelectedSong(selected);
@@ -64,8 +69,11 @@ public class PlaybackService
             }
         }
 
+        // Check if song is in library - queue the whole library starting from this song
         var allSongs = _repository.GetAll();
-        var libraryIndex = FindSongIndex(allSongs, song);
+        var libraryIndex = allSongs.FindIndex(s =>
+            s.Id == song.Id ||
+            string.Equals(s.FilePath, song.FilePath, StringComparison.OrdinalIgnoreCase));
 
         if (libraryIndex >= 0)
         {
@@ -73,33 +81,30 @@ public class PlaybackService
             return;
         }
 
-        _queue.SetQueue(new List<Song> { song });
-        _queue.JumpTo(0);
+        // Play as a single song
+        _queue.Clear();
+        _queue.Add(song);
         PlaySelectedSong(song);
     }
 
     public void PlayQueue(List<Song> songs, int startIndex = 0)
     {
-        if (songs.Count == 0)
+        _queue.Repeat = RepeatMode.Off;
+
+        if (songs == null || songs.Count == 0)
         {
             Stop();
             return;
         }
 
         if (startIndex < 0)
-        {
             startIndex = 0;
-        }
-
         if (startIndex >= songs.Count)
-        {
             startIndex = songs.Count - 1;
-        }
 
-        _queue.SetQueue(songs);
+        _queue.SetQueue(songs, startIndex);
 
-        var song = _queue.JumpTo(startIndex);
-
+        var song = _queue.CurrentSong;
         if (song != null)
         {
             PlaySelectedSong(song);
@@ -122,7 +127,6 @@ public class PlaybackService
         }
 
         var songs = _repository.GetAll();
-
         if (songs.Count > 0)
         {
             PlayQueue(songs, 0);
@@ -171,9 +175,7 @@ public class PlaybackService
         var song = _queue.CurrentSong;
 
         if (song == null)
-        {
             return;
-        }
 
         var dbSong = _repository.GetByFilePath(song.FilePath);
 
@@ -190,9 +192,7 @@ public class PlaybackService
         var song = _queue.CurrentSong;
 
         if (song == null)
-        {
             return false;
-        }
 
         return _repository.GetByFilePath(song.FilePath)?.IsFavorite ?? false;
     }
@@ -200,16 +200,11 @@ public class PlaybackService
     public void Seek(double seconds)
     {
         if (seconds < 0)
-        {
             seconds = 0;
-        }
 
         var duration = _audio.Duration;
-
         if (duration > 0 && seconds > duration)
-        {
             seconds = duration;
-        }
 
         _audio.Position = seconds;
         StateChanged?.Invoke();
@@ -228,10 +223,8 @@ public class PlaybackService
     public void SetVolume(float volume)
     {
         volume = Math.Clamp(volume, 0f, 1f);
-
         _audio.Volume = volume;
         _savedVolume = volume;
-
         StateChanged?.Invoke();
     }
 
@@ -327,13 +320,6 @@ public class PlaybackService
         PreloadLyrics(song.Title, song.Artist);
     }
 
-    private int FindSongIndex(List<Song> songs, Song target)
-    {
-        return songs.FindIndex(song =>
-            song.Id == target.Id ||
-            string.Equals(song.FilePath, target.FilePath, StringComparison.OrdinalIgnoreCase));
-    }
-
     private void TrackPlay(Song song)
     {
         try
@@ -366,14 +352,11 @@ public class PlaybackService
 
     private void PreloadNextTrack()
     {
-        var allSongs = _queue.GetAll();
-        var currentIndex = _queue.CurrentIndex;
+        var upcomingSongs = _queue.GetAll();
 
-        if (currentIndex >= 0 &&
-            currentIndex < allSongs.Count - 1 &&
-            _audio is AudioEngine ae)
+        if (upcomingSongs.Count > 0 && _audio is AudioEngine ae)
         {
-            ae.PreloadNext(allSongs[currentIndex + 1].FilePath);
+            ae.PreloadNext(upcomingSongs[0].FilePath);
         }
     }
 

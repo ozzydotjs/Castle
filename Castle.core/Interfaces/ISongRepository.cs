@@ -13,4 +13,6 @@ public interface ISongRepository
     List<Song> Search(string query);
     void Update(Song song);
     void DeleteAll();
+    void Delete(string id);
+    int RemoveDuplicates();
 }

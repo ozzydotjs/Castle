@@ -14,44 +14,54 @@
 <nav class="sidebar-nav">
     <div class="sidebar-section-label">Music</div>
     <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
-        <LiLibrary Size="18" Stroke="#BBBBBB" /> Library
+        <LiLibrary Size="18" Stroke="var(--icon-default)" /> Library
     </NavLink>
     <NavLink class="nav-item" href="dashboard" Match="NavLinkMatch.Prefix">
-        <LiLayoutDashboard Size="18" Stroke="#BBBBBB" /> Dashboard
+        <LiLayoutDashboard Size="18" Stroke="var(--icon-default)" /> Dashboard
     </NavLink>
     <NavLink class="nav-item" href="nowplaying" Match="NavLinkMatch.Prefix">
-        <LiDisc Size="18" Stroke="#BBBBBB" /> Now Playing
+        <LiDisc Size="18" Stroke="var(--icon-default)" /> Now Playing
     </NavLink>
     <NavLink class="nav-item" href="queue" Match="NavLinkMatch.Prefix">
-        <LiListOrdered Size="18" Stroke="#BBBBBB" /> Queue
+        <LiListOrdered Size="18" Stroke="var(--icon-default)" /> Queue
     </NavLink>
+    @if (StreamingEnabled)
+    {
+        <NavLink class="nav-item" href="streaming" Match="NavLinkMatch.Prefix">
+            <LiRadio Size="18" Stroke="var(--icon-default)" /> Streaming
+        </NavLink>
+    }
     
     <div class="sidebar-section-label" style="margin-top: 16px;">Tools</div>
     <NavLink class="nav-item" href="search" Match="NavLinkMatch.Prefix">
-        <LiSearch Size="18" Stroke="#BBBBBB" /> Search & Download
-    </NavLink>
-    <NavLink class="nav-item" href="equalizer" Match="NavLinkMatch.Prefix">
-        <LiSlidersHorizontal Size="18" Stroke="#BBBBBB" /> Equalizer
-    </NavLink>
-    <NavLink class="nav-item" href="lyrics" Match="NavLinkMatch.Prefix">
-        <LiMusic Size="18" Stroke="#BBBBBB" /> Lyrics
+        <LiSearch Size="18" Stroke="var(--icon-default)" /> Search & Download
     </NavLink>
     <NavLink class="nav-item" href="recentlyplayed" Match="NavLinkMatch.Prefix">
-        <LiClock Size="18" Stroke="#BBBBBB" /> Recently Played
+        <LiClock Size="18" Stroke="var(--icon-default)" /> Recently Played
+    </NavLink>
+    <NavLink class="nav-item" href="downloadqueue" Match="NavLinkMatch.Prefix">
+        <LiDownload Size="18" Stroke="var(--icon-default)" /> Downloads
     </NavLink>
     
-    <div class="sidebar-section-label" style="margin-top: 16px;">More</div>
-    <NavLink class="nav-item" href="downloadqueue" Match="NavLinkMatch.Prefix">
-        <LiDownload Size="18" Stroke="#BBBBBB" /> Downloads
-    </NavLink>
-    <NavLink class="nav-item" href="sleeptimer" Match="NavLinkMatch.Prefix">
-        <LiMoon Size="18" Stroke="#BBBBBB" /> Sleep Timer
-    </NavLink>
-    <NavLink class="nav-item" href="metadataeditor" Match="NavLinkMatch.Prefix">
-        <LiPencil Size="18" Stroke="#BBBBBB" /> Metadata
+    <div class="sidebar-section-label" style="margin-top: 16px;">Settings</div>
+    <NavLink class="nav-item" href="settings" Match="NavLinkMatch.Prefix">
+        <LiSettings Size="18" Stroke="var(--icon-default)" /> General
     </NavLink>
     <NavLink class="nav-item" href="themes" Match="NavLinkMatch.Prefix">
-        <LiPalette Size="18" Stroke="#BBBBBB" /> Themes
+        <LiPalette Size="18" Stroke="var(--icon-default)" /> Themes
+    </NavLink>
+    <NavLink class="nav-item" href="equalizer" Match="NavLinkMatch.Prefix">
+        <LiSlidersHorizontal Size="18" Stroke="var(--icon-default)" /> Equalizer
+    </NavLink>
+    <NavLink class="nav-item" href="metadataeditor" Match="NavLinkMatch.Prefix">
+        <LiPencil Size="18" Stroke="var(--icon-default)" /> Metadata
+    </NavLink>
+    <NavLink class="nav-item" href="sleeptimer" Match="NavLinkMatch.Prefix">
+        <LiMoon Size="18" Stroke="var(--icon-default)" /> Sleep Timer
+    </NavLink>
+    <NavLink class="nav-item" href="updates">
+        <LiDownloadCloud Size="18" Stroke="var(--icon-default)" />
+        <span>Updates</span>
     </NavLink>
 </nav>
 
@@ -61,7 +71,7 @@
     <div class="sidebar-section-label">
         <span>Playlists</span>
         <button @onclick="CreateNewPlaylist" class="playlist-add-btn" title="New Playlist">
-            <LiPlus Size="16" Stroke="#BBBBBB" />
+            <LiPlus Size="16" Stroke="var(--icon-default)" />
         </button>
     </div>
 
@@ -81,15 +91,24 @@
     <ul class="playlist-list">
         @foreach (var playlist in _playlists)
         {
+            var coverUrl = PlaylistService.GetPlaylistCoverUrl(playlist.Id);
             <li @onclick="() => OpenPlaylist(playlist.Id)"
                 @oncontextmenu="(e) => OpenPlaylistContextMenu(e, playlist)"
                 @oncontextmenu:preventDefault="true"
                 class="playlist-item @(PlaylistService.CurrentPlaylist?.Id == playlist.Id ? "active" : "")">
-                <LiListMusic Size="14" Stroke="#BBBBBB" /> @playlist.Name
+                @if (!string.IsNullOrEmpty(coverUrl))
+                {
+                    <img src="@coverUrl" class="playlist-thumb" />
+                }
+                else
+                {
+                    <LiListMusic Size="14" Stroke="var(--icon-default)" />
+                }
+                <span class="playlist-item-name">@playlist.Name</span>
                 <button @onclick="() => DeletePlaylist(playlist.Id)"
                         @onclick:stopPropagation="true"
                         class="playlist-delete-btn" title="Delete">
-                    <LiTrash2 Size="14" Stroke="#BBBBBB" />
+                    <LiTrash2 Size="14" Stroke="var(--icon-default)" />
                 </button>
             </li>
         }
@@ -114,6 +133,8 @@
     private bool _playlistContextVisible;
     private double _contextX, _contextY;
     private Castle.Core.Models.Playlist? _contextPlaylist;
+
+    private bool StreamingEnabled => Preferences.Get("streaming_enabled", false);
 
     protected override void OnInitialized()
     {
@@ -174,7 +195,3 @@
 
     void ClosePlaylistContext() { _playlistContextVisible = false; _contextPlaylist = null; }
 }
-<NavLink class="nav-item" href="updates">
-    <LiDownloadCloud Size="18" Stroke="var(--icon-default)" />
-    <span>Updates</span>
-</NavLink>

@@ -152,20 +152,25 @@ else if (_popularPlaylists.Count > 0)
 <div class="library-header">
     <h3>Your Library (@_songs.Count SONGS)</h3>
     <div class="top-bar">
-        <button @onclick="ScanLibrary" disabled="@_isScanning">
-            <LiFolderSync Size="16" Stroke="#FFFFFF" /> @(_isScanning ? "Scanning..." : (Settings.HasScanned ? "Re-scan Folder" : "Scan Music Folder"))
-        </button>
         <button @onclick="PlayAll" disabled="@(_songs.Count == 0)">
             <LiPlay Size="16" Stroke="#FFFFFF" /> Play All
-        </button>
-        <button @onclick="ClearLibrary" disabled="@(_songs.Count == 0)">
-            <LiTrash2 Size="16" Stroke="#FFFFFF" /> Clear
         </button>
         <button @onclick="ToggleFavoritesFilter" class="@(_showFavoritesOnly ? "filter-active" : "")">
             <LiHeart Size="16" Stroke="#FFFFFF" /> @(_showFavoritesOnly ? "Favorites" : "All Songs")
         </button>
     </div>
 </div>
+
+@* Download progress bar *@
+@if (_downloadProgress > 0 && _downloadProgress < 100)
+{
+    <div class="download-progress-bar">
+        <div class="download-progress-track">
+            <div class="download-progress-fill" style="width: @(_downloadProgress)%;"></div>
+        </div>
+        <span class="download-progress-text">Downloading... @(_downloadProgress)%</span>
+    </div>
+}
 
 @if (_progress > 0 && _progress < 100)
 {
@@ -223,25 +228,22 @@ else if (!_isScanning && !_isLoading)
     </div>
 }
 
+@* ========== CONTEXT MENU ========== *@
 @if (_contextMenuVisible)
 {
     <div class="context-menu" style="left: @(_contextX)px; top: @(_contextY)px;" @key="_contextSong?.Id">
-        @if (!_showPlaylistSubmenu)
+        @if (_showDeleteConfirm)
         {
-            <div class="context-item" @onclick="() => { PlaySong(_contextSong!); CloseContextMenu(); }"><LiPlay Size="14" Stroke="#BBBBBB" /> Play</div>
-            <div class="context-item" @onclick="() => { Player.PlayQueue(new List<Song> { _contextSong! }, 0); CloseContextMenu(); }"><LiSkipForward Size="14" Stroke="#BBBBBB" /> Play Next</div>
-            <div class="context-item" @onclick="() => { Queue.Add(_contextSong!); if (!Player.IsPlaying) Player.PlaySong(_contextSong!); CloseContextMenu(); }">
-                <LiListPlus Size="14" Stroke="#BBBBBB" /> Add to Queue
-            </div>
-            <div class="context-item" @onclick="() => { ToggleFavorite(_contextSong!); CloseContextMenu(); }">
-                @(_contextSong?.IsFavorite == true ? "💔 Unfavorite" : "❤️ Favorite")
-            </div>
+            <div class="context-item context-back" @onclick="CancelDelete"><LiArrowLeft Size="14" Stroke="#BBBBBB" /> Back</div>
             <div class="context-separator"></div>
-            <div class="context-item" @onclick="OpenPlaylistSubmenu"><LiListMusic Size="14" Stroke="#BBBBBB" /> Add to Playlist ▸</div>
-            <div class="context-separator"></div>
-            <div class="context-item" @onclick="CloseContextMenu"><LiX Size="14" Stroke="#BBBBBB" /> Close</div>
+            <div class="context-item disabled" style="padding: 8px 12px; font-size: 12px; color: var(--text-secondary); pointer-events: none;">
+                Delete "@(_contextSong?.Title)"?
+            </div>
+            <div class="context-item" @onclick="ConfirmDelete" style="color: #ff4444;">
+                <LiTrash2 Size="14" Stroke="#ff4444" /> Yes, Delete
+            </div>
         }
-        else
+        else if (_showPlaylistSubmenu)
         {
             <div class="context-item context-back" @onclick="ClosePlaylistSubmenu"><LiArrowLeft Size="14" Stroke="#BBBBBB" /> Back</div>
             <div class="context-separator"></div>
@@ -258,6 +260,22 @@ else if (!_isScanning && !_isLoading)
                     </div>
                 }
             }
+        }
+        else
+        {
+            <div class="context-item" @onclick="() => { PlaySong(_contextSong!); CloseContextMenu(); }"><LiPlay Size="14" Stroke="#BBBBBB" /> Play</div>
+            <div class="context-item" @onclick="() => { Player.PlayQueue(new List<Song> { _contextSong! }, 0); CloseContextMenu(); }"><LiSkipForward Size="14" Stroke="#BBBBBB" /> Play Next</div>
+            <div class="context-item" @onclick="() => { Queue.Add(_contextSong!); if (!Player.IsPlaying) Player.PlaySong(_contextSong!); CloseContextMenu(); }">
+                <LiListPlus Size="14" Stroke="#BBBBBB" /> Add to Queue
+            </div>
+            <div class="context-item" @onclick="() => { ToggleFavorite(_contextSong!); CloseContextMenu(); }">
+                @(_contextSong?.IsFavorite == true ? "💔 Unfavorite" : "❤️ Favorite")
+            </div>
+            <div class="context-separator"></div>
+            <div class="context-item" @onclick="OpenPlaylistSubmenu"><LiListMusic Size="14" Stroke="#BBBBBB" /> Add to Playlist ▸</div>
+            <div class="context-separator"></div>
+            <div class="context-item" @onclick="OpenDeleteConfirm" style="color: #ff4444;"><LiTrash2 Size="14" Stroke="#ff4444" /> Delete from Library</div>
+            <div class="context-item" @onclick="CloseContextMenu"><LiX Size="14" Stroke="#BBBBBB" /> Close</div>
         }
     </div>
     <div class="context-overlay" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"></div>
@@ -276,9 +294,11 @@ else if (!_isScanning && !_isLoading)
     private List<Playlist> _allPlaylists = new();
     private bool _contextMenuVisible;
     private bool _showPlaylistSubmenu;
+    private bool _showDeleteConfirm;
     private double _contextX, _contextY;
     private Song? _contextSong;
     private int _visibleCount = 50;
+    private int _downloadProgress;
     private bool _hasMoreSongs => _sortedSongs.Count > _visibleCount;
     private List<RecommendedTrack> _dailyDiscover = new();
     private List<PopularPlaylist> _popularPlaylists = new();
@@ -289,9 +309,16 @@ else if (!_isScanning && !_isLoading)
 
     protected override void OnInitialized()
     {
+        var removed = Repository.RemoveDuplicates();
+        if (removed > 0)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Startup] Removed {removed} duplicate songs");
+        }
+    
         LoadLibrary();
         Player.StateChanged += Refresh;
         Queue.QueueChanged += Refresh;
+        DownloadQueue.ProgressChanged += OnDownloadProgress;
         _ = LoadDiscoverAsync();
     }
 
@@ -363,13 +390,19 @@ else if (!_isScanning && !_isLoading)
         StateHasChanged();
     }
 
+    void OnDownloadProgress(int progress)
+    {
+        _downloadProgress = progress;
+        InvokeAsync(StateHasChanged);
+    }
+
     void Refresh() { _currentFilePath = Queue.CurrentSong?.FilePath ?? string.Empty; InvokeAsync(StateHasChanged); }
     string GetActiveClass(Song song) => song.FilePath == _currentFilePath ? "active" : "";
 
     string GetCoverUrl(string? path)
-{
-    return CoverArtService.GetCoverUrl(path);
-}
+    {
+        return CoverArtService.GetCoverUrl(path);
+    }
 
     void PlaySong(Song song) { Player.PlaySong(song); _currentFilePath = song.FilePath; ScrollToActiveSong(); }
     async void ScrollToActiveSong() { try { await JS.InvokeVoidAsync("scrollToActive", "song-list"); } catch { } }
@@ -395,14 +428,34 @@ else if (!_isScanning && !_isLoading)
     void OpenContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Song song)
     {
         _contextSong = song; _contextX = e.ClientX; _contextY = e.ClientY;
-        _contextMenuVisible = true; _showPlaylistSubmenu = false;
+        _contextMenuVisible = true; _showPlaylistSubmenu = false; _showDeleteConfirm = false;
         _allPlaylists = PlaylistService.GetAllPlaylists();
         StateHasChanged();
     }
 
     void OpenPlaylistSubmenu() { _showPlaylistSubmenu = true; _allPlaylists = PlaylistService.GetAllPlaylists(); }
     void ClosePlaylistSubmenu() { _showPlaylistSubmenu = false; }
-    void CloseContextMenu() { _contextMenuVisible = false; _showPlaylistSubmenu = false; _contextSong = null; }
+
+    void OpenDeleteConfirm() { _showDeleteConfirm = true; }
+    void CancelDelete() { _showDeleteConfirm = false; }
+
+    void ConfirmDelete()
+    {
+        if (_contextSong != null)
+        {
+            Repository.Delete(_contextSong.Id);
+            LoadLibrary();
+        }
+        CloseContextMenu();
+    }
+
+    void CloseContextMenu()
+    {
+        _contextMenuVisible = false;
+        _showPlaylistSubmenu = false;
+        _showDeleteConfirm = false;
+        _contextSong = null;
+    }
 
     void LoadLibrary()
     {
@@ -442,6 +495,7 @@ else if (!_isScanning && !_isLoading)
         return string.Format("{0}:{1:D2}", duration.Minutes, duration.Seconds);
     }
 
+    // Keep these methods for when we move them to Settings
     async Task ScanLibrary()
     {
         _isScanning = true; _progress = 0;
@@ -457,5 +511,10 @@ else if (!_isScanning && !_isLoading)
     void PlayAll() { if (_songs.Count > 0) Player.PlayQueue(_songs, 0); }
     void ClearLibrary() { Repository.DeleteAll(); _songs.Clear(); _sortedSongs.Clear(); Settings.HasScanned = false; }
 
-    public void Dispose() { Player.StateChanged -= Refresh; Queue.QueueChanged -= Refresh; }
+    public void Dispose()
+    {
+        Player.StateChanged -= Refresh;
+        Queue.QueueChanged -= Refresh;
+        DownloadQueue.ProgressChanged -= OnDownloadProgress;
+    }
 }

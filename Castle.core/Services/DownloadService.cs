@@ -104,7 +104,9 @@ public class DownloadService
                 $"-f bestaudio --extract-audio --audio-format mp3 --audio-quality 0 " +
                 $"--embed-thumbnail --embed-metadata " +
                 $"--ffmpeg-location \"{ffmpegPath.Replace("\\", "/")}\" " +
-                $"--sleep-requests 2 --sleep-interval 5 --max-sleep-interval 10 " +
+                $"-N 4 --no-part --socket-timeout 10 --retries 3 " +
+                $"--sleep-requests 1 --sleep-interval 1 --max-sleep-interval 3 " +
+                $"--no-check-certificate --prefer-insecure " +
                 $"-o \"{outputTemplate}\" --no-playlist \"{videoUrl}\"";
 
             var process = new Process

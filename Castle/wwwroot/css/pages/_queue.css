@@ -1,0 +1,130 @@
+/* ========== QUEUE PAGE ========== */
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-surface);
+    border-radius: 8px;
+    backdrop-filter: var(--glass-blur, none);
+    -webkit-backdrop-filter: var(--glass-blur, none);
+}
+
+.queue-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.queue-item-title {
+    display: block;
+    color: var(--text-primary);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-item-artist {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.queue-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.status-queued {
+    color: #888;
+    background: #1a1a1a;
+}
+
+.status-downloading {
+    color: #4caf50;
+    background: #1a3a1a;
+}
+
+.status-complete {
+    color: #4caf50;
+}
+
+.status-failed {
+    color: #ff4444;
+}
+
+/* Now Playing Header in Queue */
+.now-playing-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 8px;
+}
+
+.now-playing-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 12px;
+    display: block;
+}
+
+.now-playing-song {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.now-playing-cover {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.now-playing-cover-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.now-playing-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.now-playing-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.now-playing-artist {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.upcoming-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.5);
+}

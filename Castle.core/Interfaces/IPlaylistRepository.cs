@@ -11,4 +11,5 @@ public interface IPlaylistRepository
     List<Playlist> GetAll();
     void AddSong(string playlistId, string songId);
     void RemoveSong(string playlistId, string songId);
+    void RenamePlaylist(string playlistId, string newName);
 }

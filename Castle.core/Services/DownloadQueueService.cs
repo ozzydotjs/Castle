@@ -21,9 +21,13 @@ public class DownloadQueueService
 
     public event Action? QueueChanged;
     public event Action<DownloadQueueItem>? ItemStatusChanged;
+    public event Action<int>? ProgressChanged;
 
     public IReadOnlyList<DownloadQueueItem> Queue => _queue;
     public bool IsProcessing => _isProcessing;
+
+    private static string QueueFilePath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Castle", "download_queue.json");
 
     public DownloadQueueService(
         DownloadService downloadService,
@@ -34,6 +38,9 @@ public class DownloadQueueService
         _songRepo = songRepo;
         _playlistRepo = playlistRepo;
         _downloadService.DownloadComplete += OnDownloadComplete;
+        _downloadService.ProgressChanged += OnDownloadProgress;
+
+        LoadQueue();
     }
 
     public void AddToQueue(string videoUrl, string title, string artist, string? playlistId = null)
@@ -57,6 +64,7 @@ public class DownloadQueueService
             PlaylistId = playlistId
         });
 
+        SaveQueue();
         QueueChanged?.Invoke();
 
         if (!_isProcessing)
@@ -88,6 +96,7 @@ public class DownloadQueueService
             });
         }
 
+        SaveQueue();
         QueueChanged?.Invoke();
 
         if (!_isProcessing)
@@ -103,6 +112,7 @@ public class DownloadQueueService
         if (item != null)
         {
             _queue.Remove(item);
+            SaveQueue();
             QueueChanged?.Invoke();
         }
     }
@@ -110,7 +120,13 @@ public class DownloadQueueService
     public void ClearCompleted()
     {
         _queue.RemoveAll(q => q.Status == "Complete" || q.Status == "Failed");
+        SaveQueue();
         QueueChanged?.Invoke();
+    }
+
+    private void OnDownloadProgress(int progress)
+    {
+        ProgressChanged?.Invoke(progress);
     }
 
     private async Task ProcessQueueAsync()
@@ -124,6 +140,7 @@ public class DownloadQueueService
             item.Status = "Downloading";
             ItemStatusChanged?.Invoke(item);
             QueueChanged?.Invoke();
+            SaveQueue();
 
             try
             {
@@ -137,6 +154,7 @@ public class DownloadQueueService
 
             ItemStatusChanged?.Invoke(item);
             QueueChanged?.Invoke();
+            SaveQueue();
 
             await Task.Delay(5000);
         }
@@ -146,17 +164,14 @@ public class DownloadQueueService
 
     private async void OnDownloadComplete()
     {
-        System.Diagnostics.Debug.WriteLine($"[Queue] OnDownloadComplete fired. Items: {_queue.Count}");
+        System.Diagnostics.Debug.WriteLine($"[Queue] OnDownloadComplete fired.");
 
         var downloadFolder = _downloadService.DownloadPath;
-
         Directory.CreateDirectory(downloadFolder);
 
         var completedItems = _queue
             .Where(q => q.Status == "Complete" || q.Status == "Downloading")
             .ToList();
-
-        System.Diagnostics.Debug.WriteLine($"[Queue] Completed items: {completedItems.Count}");
 
         foreach (var item in completedItems)
         {
@@ -167,10 +182,9 @@ public class DownloadQueueService
                 var finalPath = FindNewestLikelyDownload(downloadFolder, item.Title, item.Artist);
 
                 if (string.IsNullOrWhiteSpace(finalPath) || !File.Exists(finalPath))
-                {
                     continue;
-                }
 
+                // Write metadata tags
                 try
                 {
                     using var tagFile = TagLib.File.Create(finalPath);
@@ -178,10 +192,9 @@ public class DownloadQueueService
                     tagFile.Tag.Performers = new[] { item.Artist };
                     tagFile.Save();
                 }
-                catch
-                {
-                }
+                catch { }
 
+                // Embed lyrics in background
                 _ = Task.Run(async () =>
                 {
                     try
@@ -190,13 +203,36 @@ public class DownloadQueueService
                         var metadataService = new MetadataService(lyricsService);
                         await metadataService.EmbedLyricsAsync(finalPath, item.Title, item.Artist);
                     }
-                    catch
-                    {
-                    }
+                    catch { }
                 });
 
-                item.VideoUrl = finalPath;
-                System.Diagnostics.Debug.WriteLine($"[Queue] Processed: {item.Artist} - {item.Title} at {finalPath}");
+                // Scan ONLY this one file, not the whole folder
+                try
+                {
+                    var scanner = _downloadService.GetScanner();
+                    if (scanner != null)
+                    {
+                        var songs = await scanner.ScanFolderAsync(Path.GetDirectoryName(finalPath)!);
+                        var newSong = songs.FirstOrDefault(s =>
+                            string.Equals(s.FilePath, finalPath, StringComparison.OrdinalIgnoreCase));
+
+                        if (newSong != null)
+                        {
+                            _songRepo.Insert(newSong);
+                        }
+                    }
+                }
+                catch { }
+
+                // Add to playlist if applicable
+                if (!string.IsNullOrEmpty(item.PlaylistId))
+                {
+                    var song = _songRepo.GetByFilePath(finalPath);
+                    if (song != null)
+                    {
+                        _playlistRepo.AddSong(item.PlaylistId, song.Id);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -204,41 +240,7 @@ public class DownloadQueueService
             }
         }
 
-        try
-        {
-            var scanner = _downloadService.GetScanner();
-
-            if (scanner != null)
-            {
-                System.Diagnostics.Debug.WriteLine("[Queue] Running scanner...");
-
-                var songs = await scanner.ScanFolderAsync(downloadFolder);
-                _songRepo.InsertBatch(songs);
-
-                System.Diagnostics.Debug.WriteLine("[Queue] Songs inserted into database");
-
-                foreach (var item in completedItems.Where(q => !string.IsNullOrEmpty(q.PlaylistId)))
-                {
-                    var filePath = item.VideoUrl;
-
-                    System.Diagnostics.Debug.WriteLine($"[Queue] Looking for file: {filePath}");
-
-                    var song = _songRepo.GetByFilePath(filePath);
-
-                    System.Diagnostics.Debug.WriteLine($"[Queue] Found song: {(song != null ? song.Title : "NULL")}");
-
-                    if (song != null && !string.IsNullOrEmpty(item.PlaylistId))
-                    {
-                        _playlistRepo.AddSong(item.PlaylistId!, song.Id);
-                        System.Diagnostics.Debug.WriteLine($"[Queue] Added to playlist {item.PlaylistId}: {song.Title}");
-                    }
-                }
-            }
-        }
-        catch
-        {
-        }
-
+        SaveQueue();
         QueueChanged?.Invoke();
     }
 
@@ -263,5 +265,39 @@ public class DownloadQueueService
         return Directory.GetFiles(downloadFolder, "*.mp3")
             .OrderByDescending(f => new FileInfo(f).LastWriteTimeUtc)
             .FirstOrDefault();
+    }
+
+    public void SaveQueue()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(QueueFilePath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            var json = System.Text.Json.JsonSerializer.Serialize(_queue);
+            File.WriteAllText(QueueFilePath, json);
+        }
+        catch { }
+    }
+
+    public void LoadQueue()
+    {
+        try
+        {
+            if (File.Exists(QueueFilePath))
+            {
+                var json = File.ReadAllText(QueueFilePath);
+                var saved = System.Text.Json.JsonSerializer.Deserialize<List<DownloadQueueItem>>(json);
+                if (saved != null)
+                {
+                    _queue.Clear();
+                    _queue.AddRange(saved.Where(q => q.Status == "Queued" || q.Status == "Downloading"));
+                    foreach (var item in _queue.Where(q => q.Status == "Downloading"))
+                    {
+                        item.Status = "Queued";
+                    }
+                }
+            }
+        }
+        catch { }
     }
 }

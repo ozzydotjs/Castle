@@ -1,0 +1,450 @@
+/* ========== RESPONSIVE BREAKPOINTS ========== */
+
+/* Medium desktop */
+@media (max-width: 1200px) {
+    :root {
+        --ui-sidebar-width: clamp(210px, 18vw, 250px);
+        --ui-card-min: clamp(150px, 18vw, 190px);
+        --ui-content-x: clamp(16px, 2vw, 26px);
+    }
+
+    .player-left {
+        max-width: 240px;
+    }
+
+    .player-right {
+        min-width: 150px;
+    }
+
+    .np-queue-floating {
+        width: 270px;
+    }
+}
+
+/* Small laptop / tablet */
+@media (max-width: 980px) {
+    :root {
+        --ui-sidebar-width: 210px;
+        --ui-card-min: 155px;
+        --ui-np-art: clamp(180px, 30vw, 260px);
+    }
+
+    .sidebar-brand img {
+        width: 90px;
+        height: 90px;
+    }
+
+    .brand-text {
+        font-size: 14px;
+        letter-spacing: 2px;
+    }
+
+    .nav-item {
+        padding: 9px 10px;
+        font-size: 12px;
+    }
+
+    .player-right {
+        min-width: auto !important;
+    }
+
+        .player-right > .mode-btn,
+        .player-right > svg,
+        .player-right > .volume-slider {
+            display: none !important;
+        }
+
+    .player-window-actions {
+        display: flex !important;
+    }
+
+    .player-center {
+        min-width: 260px;
+        max-width: none;
+    }
+
+    .player-bar {
+        left: var(--ui-sidebar-width, var(--sidebar-width, 210px)) !important;
+    }
+
+    .np-queue-floating {
+        top: auto;
+        right: 18px;
+        bottom: calc(var(--ui-player-height) + 18px);
+        width: min(300px, 34vw);
+        max-height: 42vh;
+    }
+}
+
+/* Compact */
+@media (max-width: 760px) {
+    :root {
+        --ui-player-height: 78px;
+        --ui-content-x: 14px;
+        --ui-content-y: 16px;
+        --ui-card-min: 145px;
+    }
+
+    .page {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 72px;
+        min-width: 72px;
+        z-index: 1200;
+        overflow-x: hidden;
+    }
+
+    .sidebar-brand {
+        padding: 14px 8px;
+    }
+
+        .sidebar-brand img {
+            width: 44px;
+            height: 44px;
+        }
+
+    .brand-text, .sidebar-section-label, .playlist-create,
+    .playlist-list, .new-playlist-btn, .sidebar-divider {
+        display: none;
+    }
+
+    .sidebar-nav, .sidebar-section {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .nav-item {
+        justify-content: center;
+        padding: 11px 8px;
+        gap: 0;
+    }
+
+        .nav-item span:not(.nav-icon), .nav-item .nav-label {
+            display: none;
+        }
+
+    main {
+        margin-left: 72px;
+        width: calc(100vw - 72px);
+    }
+
+    .content {
+        padding-bottom: calc(var(--ui-player-height) + 18px);
+    }
+
+    .player-bar {
+        left: 72px !important;
+        height: var(--ui-player-height);
+    }
+
+    .player-bar-inner {
+        padding: 0 12px;
+    }
+
+    .player-left {
+        min-width: 0;
+        max-width: 42%;
+    }
+
+    .player-center {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .player-buttons {
+        gap: 4px;
+    }
+
+    .ctrl-btn {
+        padding: 5px 7px;
+    }
+
+    .ctrl-play {
+        padding: 7px 14px;
+    }
+
+    .player-seek {
+        gap: 6px;
+    }
+
+    .np-queue-floating {
+        display: none;
+    }
+
+    .np-queue-slide-panel {
+        width: 280px;
+        right: -290px;
+    }
+
+    .np-queue-tab.active {
+        right: 280px;
+    }
+
+    .np-content {
+        max-width: min(94vw, 460px);
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .np-bottom {
+        max-width: 94vw;
+    }
+
+    .np-volume-inline {
+        display: none;
+    }
+
+    .np-back-btn {
+        top: 14px;
+        left: 14px;
+        padding: 7px 12px;
+    }
+}
+
+/* Phone */
+@media (max-width: 560px) {
+    :root {
+        --ui-card-min: 100%;
+        --ui-np-art: clamp(165px, 58vw, 230px);
+    }
+
+    main {
+        margin-left: 0;
+        width: 100vw;
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    .player-bar {
+        left: 0 !important;
+    }
+
+    .player-left {
+        max-width: 48%;
+    }
+
+    .player-cover, .player-cover-placeholder {
+        width: 40px;
+        height: 40px;
+    }
+
+    .player-text {
+        max-width: 120px;
+    }
+
+        .player-text strong {
+            font-size: 12px;
+        }
+
+        .player-text .player-artist {
+            font-size: 10px;
+        }
+
+    .player-buttons .ctrl-btn:first-child,
+    .player-buttons .ctrl-btn:last-child {
+        display: none;
+    }
+
+    .player-seek .np-time, .player-seek span {
+        display: none;
+    }
+
+    .top-bar, .sort-headers, .dash-actions, .search-box, .import-box {
+        flex-direction: column;
+    }
+
+        .search-btn, .import-btn, .top-bar button, .top-bar-button {
+            width: 100%;
+            justify-content: center;
+        }
+
+    .dash-hero-row {
+        grid-template-columns: 1fr;
+    }
+
+    .viz-style-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .np-queue-slide-panel {
+        width: 260px;
+        right: -270px;
+    }
+
+    .np-queue-tab.active {
+        right: 260px;
+    }
+
+    .np-title {
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    .np-controls {
+        gap: 4px;
+    }
+
+    .np-ctrl-btn {
+        min-width: 34px;
+        min-height: 34px;
+        padding: 6px;
+    }
+
+    .np-play-btn {
+        width: 48px;
+        height: 48px;
+    }
+
+    .np-lyrics-window {
+        height: 140px;
+    }
+
+    .player-right {
+        display: none !important;
+    }
+
+    .player-dock-actions {
+        display: flex !important;
+    }
+}
+
+/* Short screens */
+@media (max-height: 760px) {
+    .np-content {
+        padding-top: clamp(42px, 6vh, 60px);
+        gap: 8px;
+    }
+
+    .np-art-image, .np-art-placeholder {
+        width: clamp(170px, 18vw, 240px);
+        height: clamp(170px, 18vw, 240px);
+    }
+
+    .np-title {
+        font-size: clamp(19px, 1.8vw, 26px);
+        -webkit-line-clamp: 2;
+    }
+
+    .np-bottom {
+        padding: 12px 16px;
+    }
+
+    .np-lyrics-window {
+        height: clamp(110px, 18vh, 170px);
+    }
+
+    .np-lyrics-container.np-lyrics-immersive {
+        transform: translateY(-75px) scale(1.05);
+    }
+
+        .np-lyrics-container.np-lyrics-immersive .np-lyric-line.active {
+            font-size: clamp(19px, 2vw, 27px);
+        }
+}
+
+@media (max-height: 650px) {
+    .np-content {
+        padding-top: 38px;
+        gap: 6px;
+    }
+
+    .np-art-image, .np-art-placeholder {
+        width: clamp(140px, 16vw, 190px);
+        height: clamp(140px, 16vw, 190px);
+    }
+
+    .np-title {
+        font-size: clamp(17px, 1.6vw, 22px);
+        -webkit-line-clamp: 1;
+    }
+
+    .np-artist, .np-album, .np-genre, .np-lyrics-container {
+        display: none;
+    }
+
+        .np-lyrics-container.np-lyrics-immersive {
+            transform: translateY(-45px) scale(1.03);
+        }
+
+            .np-lyrics-container.np-lyrics-immersive .np-lyrics-window {
+                height: clamp(150px, 28vh, 220px);
+            }
+}
+
+/* Hide floating queue on medium screens */
+@media (max-width: 1180px) {
+    .np-queue-floating {
+        display: none;
+    }
+
+    .np-content {
+        width: min(94vw, 640px);
+        max-width: 640px;
+    }
+
+    .np-info {
+        width: min(94vw, 640px);
+        max-width: 640px;
+    }
+}
+
+/* Narrow now-playing */
+@media (max-width: 620px) {
+    .np-content {
+        width: 100vw;
+        max-width: 100vw;
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .np-art-image, .np-art-placeholder {
+        width: clamp(170px, 58vw, 240px);
+        height: clamp(170px, 58vw, 240px);
+    }
+
+    .np-info {
+        width: 94vw;
+    }
+
+    .np-title {
+        font-size: clamp(19px, 5vw, 25px);
+        max-width: 94vw;
+    }
+
+    .np-bottom {
+        width: 94vw;
+        max-width: 94vw;
+    }
+
+    .np-volume-inline {
+        display: none;
+    }
+
+    .np-controls {
+        gap: 4px;
+    }
+
+    .np-ctrl-btn {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        padding: 6px;
+    }
+
+    .np-play-btn {
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+        min-height: 50px;
+    }
+}

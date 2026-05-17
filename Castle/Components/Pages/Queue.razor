@@ -1,61 +1,84 @@
 ﻿@page "/queue"
 @using Castle.Core.Services
 @using Castle.Core.Models
+@implements IDisposable
 @inject PlaybackService Player
 @inject QueueService QueueService
 
 <h3><LiListOrdered Size="20" Stroke="#BBBBBB" /> QUEUE</h3>
 
-@if (_songs.Count == 0)
+@if (QueueService.CurrentSong != null)
+{
+    <div class="now-playing-header">
+        <span class="now-playing-label">NOW PLAYING</span>
+        <div class="now-playing-song">
+            @if (!string.IsNullOrEmpty(QueueService.CurrentSong.CoverArtPath))
+            {
+                <img src="@GetCoverUrl(QueueService.CurrentSong.CoverArtPath)" class="now-playing-cover" />
+            }
+            else
+            {
+                <span class="now-playing-cover-placeholder">🎵</span>
+            }
+            <div class="now-playing-info">
+                <span class="now-playing-title">@QueueService.CurrentSong.Title</span>
+                <span class="now-playing-artist">@QueueService.CurrentSong.Artist</span>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_upcomingSongs.Count == 0)
 {
     <div class="empty-state">
         <LiListMusic Size="48" Stroke="#555" />
         <h3>Queue is empty</h3>
-        <p class="status-text">Play some music to see your queue here.</p>
+        <p class="status-text">Add songs to the queue to see them here.</p>
     </div>
 }
 else
 {
+    <div class="upcoming-header">
+        <span>UP NEXT (@_upcomingSongs.Count songs)</span>
+        <button class="clear-queue-btn" @onclick="ClearQueue">
+            <LiX Size="14" Stroke="#ff4444" /> Clear
+        </button>
+    </div>
+    
     <ul class="song-list">
-        @for (int i = 0; i < _songs.Count; i++)
+        @for (int i = 0; i < _upcomingSongs.Count; i++)
         {
-            var song = _songs[i];
-            var isActive = i == QueueService.CurrentIndex;
-            <li @onclick="() => PlayFromQueue(i)" 
-                class="@(isActive ? "active" : "")">
-                <span class="queue-index">@(i + 1)</span>
-                @if (!string.IsNullOrEmpty(song.CoverArtPath))
-                {
-                    <img src="@GetCoverUrl(song.CoverArtPath)" class="song-cover" />
-                }
-                else
-                {
-                    <span class="song-cover-placeholder">🎵</span>
-                }
-                <span class="song-info">
-                    <span class="song-title">@song.Title</span>
-                    <span class="song-artist">@song.Artist</span>
-                </span>
-                <span class="song-duration">@FormatDuration(song.Duration)</span>
-                @if (!isActive)
-                {
-                    <button @onclick="() => RemoveFromQueue(i)" 
-                            @onclick:stopPropagation="true" 
-                            class="playlist-remove-btn" title="Remove from queue">
-                        <LiX Size="14" Stroke="#ff4444" />
-                    </button>
-                }
-                else
-                {
-                    <span style="color: var(--accent); font-size: 14px;">🔊</span>
-                }
+            var song = _upcomingSongs[i];
+            var queueIndex = i;
+            
+            <li>
+                <div class="song-item-content" @onclick="() => PlayFromQueue(queueIndex)">
+                    <span class="queue-index">@(i + 1)</span>
+                    @if (!string.IsNullOrEmpty(song.CoverArtPath))
+                    {
+                        <img src="@GetCoverUrl(song.CoverArtPath)" class="song-cover" />
+                    }
+                    else
+                    {
+                        <span class="song-cover-placeholder">🎵</span>
+                    }
+                    <span class="song-info">
+                        <span class="song-title">@song.Title</span>
+                        <span class="song-artist">@song.Artist</span>
+                    </span>
+                    <span class="song-duration">@FormatDuration(song.Duration)</span>
+                </div>
+                <button @onclick="() => RemoveFromQueue(queueIndex)"
+                        class="playlist-remove-btn" title="Remove from queue">
+                    <LiX Size="14" Stroke="#ff4444" />
+                </button>
             </li>
         }
     </ul>
 }
 
 @code {
-    private List<Song> _songs = new();
+    private List<Song> _upcomingSongs = new();
 
     protected override void OnInitialized()
     {
@@ -65,35 +88,54 @@ else
 
     void OnQueueChanged()
     {
-        LoadQueue();
-        InvokeAsync(StateHasChanged);
+        InvokeAsync(() =>
+        {
+            LoadQueue();
+            StateHasChanged();
+        });
     }
 
     void LoadQueue()
     {
-        _songs = QueueService.GetAll();
+        _upcomingSongs = QueueService.GetAll();
     }
 
     void PlayFromQueue(int index)
     {
-        Player.PlayQueue(_songs, index);
+        var song = QueueService.SkipTo(index);
+        if (song != null)
+        {
+            Player.PlaySong(song);
+        }
     }
 
-    void RemoveFromQueue(int index)
+    async void RemoveFromQueue(int index)
     {
         QueueService.RemoveAt(index);
+        LoadQueue();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    void ClearQueue()
+    {
+        QueueService.Clear();
         LoadQueue();
     }
 
     private string GetCoverUrl(string? path)
-{
-    return CoverArtService.GetCoverUrl(path);
-}
+    {
+        return CoverArtService.GetCoverUrl(path);
+    }
 
     string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalHours >= 1)
             return string.Format("{0}:{1:D2}:{2:D2}", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
         return string.Format("{0}:{1:D2}", duration.Minutes, duration.Seconds);
+    }
+
+    public void Dispose()
+    {
+        QueueService.QueueChanged -= OnQueueChanged;
     }
 }

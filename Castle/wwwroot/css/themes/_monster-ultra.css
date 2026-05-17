@@ -1,0 +1,88 @@
+/* ========== ULTRA THEME OVERRIDES ========== */
+
+/* Transparent main like Aero */
+[data-theme="Ultra"] main {
+    background: transparent;
+}
+
+/* Opaque black sidebar */
+[data-theme="Ultra"] .sidebar {
+    background: rgba(10, 13, 14, 0.94);
+}
+
+/* Glass cards like Aero */
+[data-theme="Ultra"] .suggested-card,
+[data-theme="Ultra"] .playlist-card,
+[data-theme="Ultra"] .dash-card,
+[data-theme="Ultra"] .dash-section {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 20px rgba(166,255,61,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+    [data-theme="Ultra"] .suggested-card::before,
+    [data-theme="Ultra"] .playlist-card::before,
+    [data-theme="Ultra"] .dash-card::before,
+    [data-theme="Ultra"] .dash-section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 40%;
+        background: linear-gradient(to bottom, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 50%, transparent 100%);
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    [data-theme="Ultra"] .suggested-card:hover,
+    [data-theme="Ultra"] .playlist-card:hover,
+    [data-theme="Ultra"] .dash-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 28px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 32px rgba(166,255,61,0.12);
+        border-color: rgba(166,255,61,0.25);
+    }
+
+/* Active song */
+[data-theme="Ultra"] .song-list li.active {
+    box-shadow: inset 3px 0 0 #A6FF3D;
+    background: rgba(166, 255, 61, 0.05);
+}
+
+[data-theme="Ultra"] .song-list li:hover {
+    background: rgba(166, 255, 61, 0.03);
+}
+
+/* Filter buttons */
+[data-theme="Ultra"] button.filter-active {
+    background: rgba(166, 255, 61, 0.1);
+    border-color: rgba(166, 255, 61, 0.25);
+    color: #A6FF3D;
+}
+
+/* Selection */
+[data-theme="Ultra"] ::selection {
+    background: rgba(166, 255, 61, 0.18);
+    color: #FFFFFF;
+}
+
+/* Seek/volume */
+[data-theme="Ultra"] input[type="range"] {
+    accent-color: #A6FF3D;
+}
+
+[data-theme="Ultra"] .progress-fill {
+    background: #A6FF3D;
+}
+
+/* Glass floating panels */
+[data-theme="Ultra"] .np-queue-floating,
+[data-theme="Ultra"] .context-menu {
+    background: rgba(10, 13, 14, 0.94);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(199, 208, 211, 0.12);
+}

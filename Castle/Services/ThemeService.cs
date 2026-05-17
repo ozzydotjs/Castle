@@ -151,26 +151,26 @@ public class ThemeService
                 SidebarBg = "#FF7AAD"
             },
 
-            // Landog
+            // Landog (updated - darker/slate)
             new()
             {
                 Name = "Landog",
                 Description = "cant handle a shade lighter than black",
-                BgPrimary = "#252330",
-                BgSecondary = "#2B2938",
-                BgSurface = "#3B3A4A",
-                Border = "#575669",
-                TextPrimary = "#F5F9F8",
-                TextSecondary = "#A1A2AB",
-                Accent = "#595168",
-                AccentHover = "#6E6680",
-                AccentSubtle = "#3B3A4A",
-                AccentActive = "#A1A2AB",
-                IconDefault = "#A1A2AB",
-                ProgressFill = "#595168",
-                FavoriteColor = "#6E6680",
-                PlayerBarBg = "#2B2938",
-                SidebarBg = "#1B1826"
+                BgPrimary = "#1E1C26",
+                BgSecondary = "#24222E",
+                BgSurface = "#2E2C3A",
+                Border = "#3D3B4A",
+                TextPrimary = "#E8E9ED",
+                TextSecondary = "#8E8C9A",
+                Accent = "#5E5A70",
+                AccentHover = "#736E85",
+                AccentSubtle = "#2E2C3A",
+                AccentActive = "#9491A5",
+                IconDefault = "#8E8C9A",
+                ProgressFill = "#5E5A70",
+                FavoriteColor = "#736E85",
+                PlayerBarBg = "#24222E",
+                SidebarBg = "#15131C"
             },
 
             // Teshido
@@ -334,7 +334,60 @@ public class ThemeService
                 PlayerBarBg = "#120000",
                 SidebarBg = "#050505"
             },
+            // _Ayranic
+            new()
+            {
+                Name = "_Ran",
+                Description = "ECHUUUU",
+                Wallpaper = "ayranic-bgm.png",
 
+                BgPrimary = "rgba(8,18,36,0.28)",
+                BgSecondary = "rgba(11,20,40,0.35)",
+                BgSurface = "rgba(14,25,48,0.40)",
+                Border = "rgba(160,210,255,0.18)",
+
+                TextPrimary = "#F4F7FB",
+                TextSecondary = "#B8C7D9",
+
+                Accent = "#4DD7FF",
+                AccentHover = "#7DE4FF",
+                AccentSubtle = "rgba(77,215,255,0.12)",
+                AccentActive = "#57F2C3",
+
+                IconDefault = "#B8C7D9",
+                ProgressFill = "#57F2C3",
+                FavoriteColor = "#F7D77A",
+
+                PlayerBarBg = "rgba(11,20,40,0.42)",
+                SidebarBg = "rgba(6,12,24,0.50)"
+            },
+                // Ultra
+                new()
+                {
+                    Name = "Ultra",
+                    Description = "Some people are impossible to please... ",
+                    Wallpaper = "monster-ultra-bg.png",
+
+                    BgPrimary = "rgba(31,38,40,0.25)",
+                    BgSecondary = "rgba(38,46,48,0.35)",
+                    BgSurface = "rgba(45,54,56,0.35)",
+                    Border = "rgba(199,208,211,0.15)",
+
+                    TextPrimary = "#FFFFFF",
+                    TextSecondary = "#E6EAEB",
+
+                    Accent = "#00C8D7",
+                    AccentHover = "#72E6F2",
+                    AccentSubtle = "rgba(0,200,215,0.15)",
+                    AccentActive = "#72E6F2",
+
+                    IconDefault = "#E6EAEB",
+                    ProgressFill = "#A6FF3D",
+                    FavoriteColor = "#A6FF3D",
+
+                    PlayerBarBg = "rgba(38,46,48,0.40)",
+                    SidebarBg = "rgba(10,13,14,0.90)"
+                },
             // ========== SPECIAL THEMES ==========
 
             // RGB Gamer

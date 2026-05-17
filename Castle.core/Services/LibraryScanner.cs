@@ -134,7 +134,7 @@ public class LibraryScanner : ILibraryScanner
                         {
                             artist = extractedArtist;
 
-                            if (string.IsNullOrWhiteSpace(genre))
+                            if (IsWeakGenre(genre))
                             {
                                 genre = string.Join(", ", genres.Take(3));
                             }
@@ -142,7 +142,7 @@ public class LibraryScanner : ILibraryScanner
                     }
                 }
 
-                if (artist != "Unknown Artist" && string.IsNullOrWhiteSpace(genre))
+                if (artist != "Unknown Artist" && IsWeakGenre(genre))
                 {
                     var genres = await _lastFm.GetArtistGenresAsync(artist);
 
@@ -207,6 +207,32 @@ public class LibraryScanner : ILibraryScanner
             "image/jpg" => ".jpg",
             _ => ".jpg"
         };
+    }
+
+    private static bool IsWeakGenre(string? genre)
+    {
+        if (string.IsNullOrWhiteSpace(genre))
+        {
+            return true;
+        }
+
+        var normalized = genre.Trim().ToLowerInvariant();
+
+        var weakGenres = new HashSet<string>
+        {
+            "music",
+            "unknown",
+            "unknown genre",
+            "other",
+            "youtube",
+            "misc",
+            "miscellaneous",
+            "none",
+            "n/a",
+            "na"
+        };
+
+        return weakGenres.Contains(normalized);
     }
 
     private string? ExtractArtistFromFilename(string filename)

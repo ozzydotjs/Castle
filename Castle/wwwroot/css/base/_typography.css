@@ -1,0 +1,16 @@
+/* ========== TYPOGRAPHY ========== */
+
+.brand-text {
+    color: var(--text-primary);
+    font-size: clamp(14px, 1.2vw, 18px);
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.status-text {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 13px;
+    margin: 10px 0;
+}

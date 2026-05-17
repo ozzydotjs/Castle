@@ -1,11 +1,14 @@
 @page "/search"
 @using Castle.Core.Services
+@using Castle.Core.Interfaces
 @inject SearchService SearchService
 @inject DownloadService DownloadService
 @inject RecommendationService RecommendationService
 @inject DownloadQueueService DownloadQueue
 @inject PlaylistImportService PlaylistImport
 @inject IBlacklistRepository _blacklistRepo
+@inject StreamSnipper StreamSnipper
+@inject IAudioEngine AudioEngine
 
 <div class="search-page">
     @* ========== SEARCH BAR ========== *@
@@ -118,6 +121,9 @@
                                     <span class="rec-reason">@rec.Reason</span>
                                 </div>
                                 <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button @onclick="() => PreviewRec(rec)" class="preview-btn" title="30s Preview">
+                                        <LiPlay Size="14" Stroke="#72E6F2" />
+                                    </button>
                                     <button @onclick="() => BlacklistRec(rec)" class="blacklist-btn" title="Not Interested">
                                         <LiEyeOff Size="14" Stroke="#ff4444" />
                                     </button>
@@ -176,6 +182,9 @@
                                     <span class="search-author">@result.Author — @result.Duration</span>
                                 </div>
                                 <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button @onclick="() => PreviewResult(result)" class="preview-btn" title="30s Preview">
+                                        <LiPlay Size="14" Stroke="#72E6F2" />
+                                    </button>
                                     <button @onclick="() => DownloadDirectResult(result)" class="download-btn" title="Download Now">
                                         <LiDownload Size="14" Stroke="#4caf50" /> Download
                                     </button>
@@ -350,6 +359,20 @@
 
     void ToggleImportSection() => _importExpanded = !_importExpanded;
     void ToggleRecsSection() => _recsExpanded = !_recsExpanded;
+
+    async void PreviewResult(SearchResult result)
+    {
+        _status = $"Preview: {result.Title}...";
+        StateHasChanged();
+        await StreamSnipper.PlayPreviewAsync(result.VideoId, AudioEngine);
+    }
+
+    async void PreviewRec(RecommendedTrack rec)
+    {
+        _status = $"Preview: {rec.Title}...";
+        StateHasChanged();
+        await StreamSnipper.PlayPreviewAsync(rec.VideoId, AudioEngine);
+    }
 
     async void DownloadDirect(RecommendedTrack rec)
     {
