@@ -12,14 +12,13 @@ public static class AppVersion
 
     private static string GetCurrentVersion()
     {
-        var assembly = Assembly.GetExecutingAssembly();
+        var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
         var informationalVersion = assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
 
         if (!string.IsNullOrWhiteSpace(informationalVersion))
         {
-            // Strip commit hash if present (e.g. "1.0.1+abc123" -> "1.0.1")
             var plusIndex = informationalVersion.IndexOf('+');
             if (plusIndex > 0)
                 informationalVersion = informationalVersion[..plusIndex];
@@ -27,11 +26,10 @@ public static class AppVersion
             return $"v{informationalVersion}";
         }
 
-        // Fallback to assembly version
         var version = assembly.GetName().Version;
         if (version != null)
             return $"v{version.Major}.{version.Minor}.{version.Build}";
 
-        return "v1.0.0"; // Ultimate fallback
+        return "v1.0.0";
     }
 }
