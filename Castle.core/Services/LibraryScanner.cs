@@ -78,7 +78,6 @@ public class LibraryScanner : ILibraryScanner
                             var cover = tag.Pictures[0];
                             var extension = GetImageExtensionFromMimeType(cover.MimeType);
 
-                            // Use content hash as filename to deduplicate across rescans
                             var hash = ComputeHash(cover.Data.Data);
                             var coverFileName = $"cover_{hash}{extension}";
                             coverPath = Path.Combine(_coversFolder, coverFileName);

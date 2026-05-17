@@ -73,6 +73,10 @@ public class SongRepository : ISongRepository
 
     public void Delete(string id) =>
         _database.GetDatabase().GetCollection<Song>(CollectionName).Delete(id);
+    public void ClearCache()
+    {
+        _database.GetDatabase().Checkpoint();
+    }
 
     // One-time cleanup: remove any existing duplicates (keep the first inserted)
     public int RemoveDuplicates()
