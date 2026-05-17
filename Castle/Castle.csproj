@@ -26,8 +26,10 @@
 		<ApplicationId>com.companyname.castle</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
+		<Version>$(ApplicationDisplayVersion).$(ApplicationVersion)</Version>
+		<InformationalVersion>$(Version)</InformationalVersion>
 
 		<WindowsPackageType>None</WindowsPackageType>
 
@@ -36,6 +38,18 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+
+		<!-- Strip unused locales (keeps only English, saves ~50MB) -->
+		<SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+		<!-- Kill default MAUI icon/splash generation -->
+		<AppxUseDefaultAppIcons>false</AppxUseDefaultAppIcons>
+		<AppxUseDefaultSplashScreen>false</AppxUseDefaultSplashScreen>
+	</PropertyGroup>
+
+	<!-- Strip debug symbols from release builds -->
+	<PropertyGroup Condition="'$(Configuration)'=='Release'">
+		<DebugType>none</DebugType>
+		<DebugSymbols>false</DebugSymbols>
 	</PropertyGroup>
 
 	<!-- Kill Windows transparency and acrylic -->
@@ -51,7 +65,7 @@
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
-		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+		<MauiImage Remove="Resources\Images\dotnet_bot.svg" />
 
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
@@ -84,14 +98,6 @@
 		</None>
 
 		<None Update="ffmpeg.exe" Condition="Exists('ffmpeg.exe')">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-
-		<None Update="ffplay.exe" Condition="Exists('ffplay.exe')">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-
-		<None Update="ffprobe.exe" Condition="Exists('ffprobe.exe')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 
